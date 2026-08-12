@@ -1,7 +1,7 @@
 # PANW EAL Demo — Real Attack Lifecycles for Cortex XSIAM/XDR
 
-Five self-contained demo cases, each a **complete, role-correct attack
-lifecycle** (initial access → … → objective), that generate **Palo Alto Networks
+**Ten** self-contained demo cases, each a **complete, role-correct attack
+lifecycle** with a start → middle → end, that generate **Palo Alto Networks
 Firewall EAL-log** analytics and Threat-Prevention alerts in **Cortex XSIAM /
 XDR**. A single orchestrator provisions the attacker, discovers all parameters,
 and runs every case one at a time — unattended.
@@ -32,26 +32,39 @@ Alert reference:
 
 ---
 
-## The five lifecycles
+## The ten lifecycles
 
-| Case | Lifecycle (Initial Access → … → Objective) | Direction | Doc |
-|------|--------------------------------------------|-----------|-----|
-| **1** | Phishing/drive-by → DGA C2 → DNS tunneling → exfil to rare domain | victim → attacker | [case-1](case-1/README.md) |
-| **2** | Attacker exploits the victim's web app (traversal → Spring4Shell → web-shell) | attacker → victim | [case-2](case-2/README.md) |
-| **3** | Phishing → RPC recon → DCOM / WinRM / SVCCTL / Scheduled-Task lateral movement | victim → internal | [case-3](case-3/README.md) |
-| **4** | Phishing → LDAP recon → WPAD → EFSRPC → DCSync → Bronze Bit | victim → DC | [case-4](case-4/README.md) |
-| **5** | Phishing → FTP → SSH → ICMP → SMB exfil to the attacker | victim → attacker | [case-5](case-5/README.md) |
+| Case | Story — Lifecycle (start → middle → end) | Direction | Doc |
+|------|------------------------------------------|-----------|-----|
+| **1** | *Drive-by to Data Theft* — phishing → DGA C2 → DNS tunneling → rare-domain exfil | victim → attacker | [case-1](case-1/README.md) |
+| **2** | *Web-App Breach* — attacker exploits the victim's web app (traversal → Spring4Shell → web-shell) | attacker → victim | [case-2](case-2/README.md) |
+| **3** | *Lateral Movement* — phishing → RPC recon → DCOM / WinRM / SVCCTL / Scheduled-Task | victim → internal | [case-3](case-3/README.md) |
+| **4** | *AD Domination* — phishing → LDAP recon → WPAD → EFSRPC → DCSync → Bronze Bit | victim → DC | [case-4](case-4/README.md) |
+| **5** | *Covert Exfil* — phishing → FTP → SSH → ICMP → SMB exfil | victim → attacker | [case-5](case-5/README.md) |
+| **6** | *Ghost in the DNS* — phishing → subdomain fuzzing → dyn-DNS → rare TLS/UA → recurring rare-domain C2 | victim → attacker | [case-6](case-6/README.md) |
+| **7** | *Poisoned Well* — phishing → rogue MS-Update server → update over HTTP → unmanaged device → trojan C2 | victim → attacker | [case-7](case-7/README.md) |
+| **8** | *The Departing Employee* — job-hunting/browsing tells → new/rare FTP → massive upload (insider) | insider → drop | [case-8](case-8/README.md) |
+| **9** | *Pass-the-Hash Playbook* — phishing → long-user/NTLM → machine NTLM → RC4 Kerberos → ADFS/Golden SAML | victim → DC/ADFS | [case-9](case-9/README.md) |
+| **10** | *Tunnels & Shadows* — phishing → uncommon SSH → SSH tunnel → rare ad-domains → remote task persistence | victim → attacker | [case-10](case-10/README.md) |
 
-Every stage maps to an EAL analytics rule that is enabled in the tenant; the
-rule IDs are in each case's README §1 and printed at runtime.
+Every stage maps to an EAL rule (IDs in each case's README §1, printed at
+runtime). Cases 1–7 & 10 lean on **enabled** rules; cases 8–9 (insider + identity)
+include a few detectors you may need to **enable** in the tenant — noted per case.
 
 ---
 
 ## Quick start
 
+### 0) Passwordless SSH to the attacker — once
+So you never retype the Kali password: install an SSH key on the attacker (enter
+the password **one** time; nothing is stored in plaintext). Every `ssh`/`scp` and
+the orchestrator are passwordless afterwards.
+```powershell
+.\Setup-AttackerAuth.ps1                 # root@170.187.158.212 by default
+```
+
 ### 1) Provision the attacker (Kali) — once
 ```powershell
-# from the Windows victim (approve the 1Password/SSH prompt when it appears):
 .\Invoke-AttackLifecycle.ps1 -Provision -DryRun     # show the plan
 .\Invoke-AttackLifecycle.ps1 -Provision -Live       # provision + run all
 ```
@@ -82,6 +95,7 @@ eal-demo/
 ├── README-lifecycle.md           <- the lifecycle model + orchestrator (start here)
 ├── README-scenarios.md           <- simpler "point everything at one server" runner
 ├── README-cases.md               <- the five cases + full stage→rule matrix
+├── Setup-AttackerAuth.ps1        <- one-time: passwordless SSH key to the attacker
 ├── Invoke-AttackLifecycle.ps1    <- GLOBAL orchestrator (attacker + victim, unattended)
 ├── Run-Scenarios.ps1             <- simpler all-cases runner (victim-only)
 ├── attacker/                     <- runs on KALI
@@ -90,7 +104,7 @@ eal-demo/
 ├── target-server/
 │   └── setup-target-server.sh    <- lighter listener-only setup for the target box
 ├── _shared/                      <- shared launcher / Run-All / IA helpers (source copies)
-└── case-1 … case-5/
+└── case-1 … case-10/
     ├── README.md                 <- per-case design, flow, step-by-step, expected alerts
     ├── Start-Demo.cmd / .ps1     <- one-click per-case launcher
     ├── config/lab-config.ps1     <- params, DryRun, stage map

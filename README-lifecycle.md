@@ -39,6 +39,17 @@ parameters, and runs every case one at a time — unattended.
 Every stage maps to an **enabled** EAL rule (rule IDs are in each case's
 `README.md` §1 and printed at runtime).
 
+## 0. Passwordless SSH to the attacker (once)
+
+So SSH/scp/provisioning never prompt for the Kali password again, install a key
+on the attacker (you enter the password one time; nothing is stored in plaintext):
+```powershell
+.\Setup-AttackerAuth.ps1                 # root@170.187.158.212 by default
+.\Setup-AttackerAuth.ps1 -Attacker 1.2.3.4 -User kali
+```
+This is the secure alternative to saving a password variable — the credential
+lives as an authorized key on the remote machine, not as plaintext on disk.
+
 ## 1. Provision the attacker (once)
 
 The orchestrator can push + start the attacker infra for you:

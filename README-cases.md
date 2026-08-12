@@ -57,8 +57,34 @@ session `18f84dd7`) → 4. SSH downgrade `f154f3c5` (+ Unusual SSH Activity
 `f1545c54`) → 5. Suspicious ICMP `f3389ebd` (+ echo-to-multiple `09f9a9a7`, smurf
 `72694178`) → 6. Rare SMB file transfer `045e06dd`
 
-> Every rule id above appears in the tenant's enabled-rules list. Collectively
-> the five cases exercise ~25 enabled EAL detectors across the full ATT&CK arc.
+### Case 6 — Ghost in the DNS (evasive C2)
+1. **IA** phishing → 2. Subdomain Fuzzing `fdcaa14c` → 3. Recurring dyn-DNS
+`00977673` → 4. rare TLS+UA `7f213d7d` → 5. recurring rare-domain C2 `8c2e83de`
+(+`c2dbeac4`)
+
+### Case 7 — Poisoned Well (rogue software-update hijack)
+1. **IA** phishing → 2. Rare MS-Update Server `3d068240` → 3. MS-Update over HTTP
+`a3602352` → 4. unique client model `59b720f1` → 5. trojan C2 `c2da63d1`
+
+### Case 8 — The Departing Employee (insider) — *starts with insider behaviour, no phishing*
+1. job-hunting + time-consuming browsing *(T1593, enable if off)* → 2. New FTP
+Server `ce208ea2` + rare FTP user `df8fa99b` → 3. massive upload to rare
+storage/mail *(T1567.002, enable if off)*
+
+### Case 9 — Pass-the-Hash Playbook (identity/ITDR)
+1. **IA** phishing → 2. long-username login (T1190) + Rare NTLM (T1550) → 3.
+machine-account NTLM (T1187) → 4. weak RC4 Kerberos TGT (T1556.001) → 5. ADFS
+sync / Golden SAML (T1606.002) *(enable ITDR + these rules)*
+
+### Case 10 — Tunnels & Shadows (covert ops & persistence)
+1. **IA** phishing → 2. Uncommon SSH session `18f84dd7` → 3. Unusual SSH Activity
+`f1545c54` → 4. rare advertising domains *(T1176.001, enable if off)* → 5. remote
+Scheduled-Task from a rarely-seen host *(T1053, enable if off)*
+
+> Cases 1–5 map entirely to enabled rules. Cases 6–7 & 10 lean on enabled rules
+> plus a couple that may need enabling; cases 8–9 (insider + identity) include
+> several detectors to enable (noted per stage). Collectively the ten cases
+> exercise ~40 EAL detectors across the full ATT&CK arc.
 
 ---
 

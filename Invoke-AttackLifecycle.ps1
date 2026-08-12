@@ -28,7 +28,7 @@ param(
     [string] $Attacker         = "170.187.158.212",   # Kali attacker / C2
     [string] $SshUser          = "root",
     [string] $VictimIP,                               # auto-detected if omitted
-    [int[]]  $Cases            = @(1,2,3,4,5),
+    [int[]]  $Cases            = @(1,2,3,4,5,6,7,8,9,10),
     [switch] $Live,
     [switch] $DryRun,
     [switch] $Provision,                              # scp+run attacker-setup on Kali
@@ -70,8 +70,8 @@ if ($Provision) {
     }
 }
 
-# ---- AD auto-detect (cases 3/4) -------------------------------------------
-if (3 -in $Cases -or 4 -in $Cases) {
+# ---- AD auto-detect (cases 3/4/9/10) --------------------------------------
+if (($Cases | Where-Object { $_ -in 3,4,9,10 })) {
     if (-not $Domain) { $Domain = $env:USERDNSDOMAIN }
     if (-not $Domain) { try { $Domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name } catch {} }
     if (-not $DomainController -and $Domain) {
@@ -91,10 +91,15 @@ $ov = @{
     4 = @{ AttackerC2=$Attacker }
     5 = @{ AttackerC2=$Attacker; FtpServer=$Attacker; IcmpTarget=$Attacker
            SshServers="${Attacker}:2201,${Attacker}:2202,${Attacker}:2203"; SmbShare="\\$Attacker\share" }
+    6 = @{ AttackerC2=$Attacker }
+    7 = @{ AttackerC2=$Attacker }
+    8 = @{ AttackerC2=$Attacker }
+    9 = @{ AttackerC2=$Attacker }
+    10 = @{ AttackerC2=$Attacker }
 }
-if ($Domain)           { $ov[3].Domain=$Domain;                     $ov[4].Domain=$Domain }
-if ($DomainController) { $ov[3].DomainController=$DomainController; $ov[4].DomainController=$DomainController }
-if ($LateralTarget)    { $ov[3].LateralTarget=$LateralTarget }
+if ($Domain)           { $ov[3].Domain=$Domain;                     $ov[4].Domain=$Domain; $ov[9].Domain=$Domain }
+if ($DomainController) { $ov[3].DomainController=$DomainController; $ov[4].DomainController=$DomainController; $ov[9].DomainController=$DomainController }
+if ($LateralTarget)    { $ov[3].LateralTarget=$LateralTarget; $ov[10].LateralTarget=$LateralTarget }
 if ($SweepHosts)       { $ov[3].SweepHosts=$SweepHosts }
 
 function Write-Local([int]$c,[hashtable]$h){
