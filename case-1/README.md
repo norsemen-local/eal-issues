@@ -1,28 +1,29 @@
-# EAL Demo — Case 1: Drive-by to Data Theft (Malware C2 & Exfil)
+# Case 1 — Drive-by to Data Theft (Malware C2 & Exfil)
 
-A complete intrusion, start to finish: the attacker **breaches a public-facing
-web app (Initial Access)**, the implant beacons out over DGA domains and DNS
-tunneling, makes suspicious/failed DNS lookups, and exfiltrates to a rarely-seen
-domain. The Palo Alto NGFW logs it as **EAL logs**; Cortex XSIAM/XDR raises the
-analytics alerts; and (bonus) DNS Security **sinkholes/blocks** the test domains
-woven in — so the same run shows **detect *and* block**.
+**Lifecycle:** a Windows **victim** is phished/drive-by compromised, the implant
+beacons out to the **attacker** (Kali) over DGA domains and DNS tunneling, makes
+suspicious/failed DNS lookups, and exfiltrates to a rarely-seen domain. The Palo
+Alto NGFW logs it as **EAL logs**; Cortex XSIAM/XDR raises the analytics alerts;
+and DNS Security **sinkholes/blocks** the test domains woven in (detect **and**
+block).
 
-> One of five demo cases (see `../README-cases.md`). Every stage maps to an
-> **enabled** EAL rule in your tenant, and each case opens with a clear,
-> reliably-triggered **Initial Access**.
+- **Roles:** Kali = attacker / C2 (`AttackerC2`, default `170.187.158.212`);
+  this Windows host = victim (runs the scripts). All traffic is victim → attacker.
+- One of five cases — see [`../README.md`](../README.md) and
+  [`../README-cases.md`](../README-cases.md).
 
 ---
 
 ## 1. Attack flow → enabled EAL rules
 
 ```
-  ATTACKER ──▶ PALO ALTO NGFW (EAL) ──▶ Cortex XSIAM/XDR
-   (1) WEB BREACH ─▶ (2) DGA ─▶ (3) DNS tunnel ─▶ (4) odd DNS ─▶ (5) rare-domain exfil
+  VICTIM(Windows) ──▶ PAN NGFW (EAL) ──▶ Cortex XSIAM/XDR       ATTACKER(Kali)=C2
+   (1) PHISHING/DRIVE-BY ─▶ (2) DGA ─▶ (3) DNS tunnel ─▶ (4) odd DNS ─▶ (5) rare-domain exfil
 ```
 
-| # | Stage (ATT&CK tactic) | What the script does | Enabled EAL alert | Rule id | Technique |
-|---|----------------------|----------------------|-------------------|---------|-----------|
-| 1 | **INITIAL ACCESS** (TA0001) | Spring4Shell + traversal against the public web app | **Suspicious failed HTTP request - Spring4Shell** | `1028c23d` | T1190 |
+| # | Stage (ATT&CK tactic) | What the victim does | Enabled EAL / firewall alert | Rule id | Technique |
+|---|----------------------|----------------------|------------------------------|---------|-----------|
+| 1 | **INITIAL ACCESS** (TA0001) | Lured to a phishing page + malware drive-by, pulls payload from the attacker | **Phishing site access** / **Suspicious Phishing Site Access** + malware URL (URL Filtering) | *(URL Filtering)* | T1566 · T1204 |
 | 2 | **C2** (TA0011) | 45 random-looking domain lookups (DGA) | **Random-Looking Domain Names** | `ce6ae037` | T1568.002 |
 | 3 | **C2 / Exfil** (TA0011) | >10 KB encoded into DNS subdomains | **DNS Tunneling** | `61a5263c` | T1071.004 |
 | 4 | **C2** (TA0011) | Malformed / non-existent DNS lookups | **Suspicious DNS traffic** + **Failed DNS** | `2a77fad6`, `74c65024` | T1071.004 |
@@ -35,28 +36,23 @@ the firewall **sinkholes/blocks** them — visible in Monitor ▸ Logs ▸ Threa
 ---
 
 ## 2. Prerequisites
-
-| Component | Requirement |
-|-----------|-------------|
-| Attacker host | One Windows box, PowerShell 5.1+. Agent installed is fine. |
-| Web server (IA) | A lab web server reachable **through** the firewall (`TargetWebServer`, http://). It need not be vulnerable — the request pattern is what fires the alert. |
-| NGFW | EAL enabled + DNS Security & URL/Vuln profiles + log forwarding to Cortex; DNS + HTTP egress traverses the firewall. |
-| Cortex | XSIAM/XDR ingesting the firewall EAL logs; rules above enabled. |
+- Windows victim, PowerShell 5.1+, egress **through the PAN NGFW** (EAL + log
+  forwarding to Cortex; DNS Security for the block layer).
+- The Kali attacker box up (`attacker/attacker-setup.sh`) so the phishing-page /
+  payload pull resolves. The "Phishing site access" alert itself comes from the
+  URL-Filtering test pages and needs only firewall egress.
 
 ---
 
 ## 3. Run it
 
-**Double-click `Start-Demo.cmd`** → **[1] Configure** (web server + domains) →
-**[2] Preflight → [3] Dry run → [4] Run**. Or:
-
+Via the global orchestrator (recommended):
 ```powershell
-cd D:\PANW\eal-demo\case-1
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-.\scripts\00-preflight.ps1
-.\scripts\Run-All.ps1 -DryRun
-.\scripts\Run-All.ps1 -PauseBetween
+.\Invoke-AttackLifecycle.ps1 -Cases 1 -DryRun     # rehearse
+.\Invoke-AttackLifecycle.ps1 -Cases 1 -Live       # run
 ```
+Or standalone: **`case-1\Start-Demo.cmd`** → **[2] Preflight → [3] Dry run →
+[4] Run**. Set the attacker/C2 host via **[1] Configure** (`AttackerC2`).
 
 ---
 
@@ -64,17 +60,17 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 | Stage | Alert | Rule id | Confirm |
 |-------|-------|---------|---------|
-| 1 | Suspicious failed HTTP request - Spring4Shell | `1028c23d` | `class.module.classLoader` request to the web server |
-| 2 | Random-Looking Domain Names | `ce6ae037` | many random root domains from the host |
+| 1 | Phishing site access + malware URL | *(URL Filtering)* | victim → phishing/malware URL + attacker host |
+| 2 | Random-Looking Domain Names | `ce6ae037` | many random root domains from the victim |
 | 3 | DNS Tunneling | `61a5263c` | >10 KB under `tunnel.<DgaRootDomain>` |
 | 4 | Suspicious DNS traffic / Failed DNS | `2a77fad6` / `74c65024` | malformed / NXDOMAIN lookups |
 | 5 | Abnormal Communication to a Rare Domain | `c2da63d1` | recurring hits to the rare domain |
 
 Firewall block proof: **Monitor ▸ Logs ▸ Threat** shows the `test-*.testpanw.com`
-DNS Security sinkholes. See `docs/verification-checklist.md`.
+DNS Security sinkholes. See [`docs/verification-checklist.md`](docs/verification-checklist.md).
 
 ---
 
 ## 5. Safety
-Dummy Spring4Shell pattern (no real RCE), benign DNS lookups, PANW test domains.
-`DryRun` sends nothing. Authorized labs only.
+Phishing uses Palo Alto's benign URL-Filtering test pages; DNS lookups are benign;
+PANW test domains only. `DryRun` sends nothing. Authorized labs only.

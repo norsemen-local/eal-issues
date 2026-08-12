@@ -1,0 +1,25 @@
+# Normalize text files to LF in the repository and working tree by default.
+* text=auto eol=lf
+
+# Keep Unix/Linux scripts LF in the working tree so they run correctly on Linux.
+*.sh text eol=lf
+*.bash text eol=lf
+
+# PowerShell supports LF and this avoids noisy CRLF conversion warnings.
+*.ps1 text eol=lf
+*.psm1 text eol=lf
+*.psd1 text eol=lf
+
+# Windows batch files are the exception and should use CRLF locally.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files should never be line-ending normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary

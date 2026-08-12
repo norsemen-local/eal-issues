@@ -1,70 +1,66 @@
-# EAL Demo — Case 2: External Web-Application Exploitation
+# Case 2 — External Exploitation of a Public Web App (attacker-driven)
 
-An attacker probes and exploits an internet/DMZ-facing web application. The Palo
-Alto Networks NGFW inspects the malicious HTTP as **EAL (Enhanced Application)
-logs**, Cortex XSIAM/XDR raises the **web-attack analytics alerts**, and
-Vulnerability Protection / URL Filtering can **block** the exploit attempts.
+**Lifecycle:** the **attacker** (Kali) actively exploits the **victim's**
+public-facing web application — directory traversal, a Spring4Shell attempt, and
+web-shell parameter injection. The Palo Alto NGFW inspects the inbound HTTP as
+**EAL logs**, Cortex XSIAM/XDR raises the web-attack analytics, and Vulnerability
+Protection can **block** the exploit.
 
-All requests are crafted to *look* malicious (so the firewall inspects and logs
-them) but are **benign** — dummy payloads that don't actually exploit anything.
-
-> One of the five demo cases. Each covers a **different, non-overlapping** set of
-> EAL-log alerts. See `../README-cases.md` for the full matrix.
+- **Roles:** Kali = attacker (source of the exploits); the web server being
+  attacked = victim. This is the one **attacker → victim** (inbound) case.
+- All requests are crafted to *look* malicious but are **benign** — dummy payloads.
+- One of five cases — see [`../README.md`](../README.md).
 
 ---
 
-## 1. Attack flow → EAL alerts
+## 1. Attack flow → enabled EAL rules
 
 ```
-  ATTACKER  ──HTTP──▶  PALO ALTO NGFW (EAL logs + Vuln Protection)  ──▶  WEB APP
-                              │
-                              └── EAL logs / threat logs ──▶ Cortex XSIAM/XDR
-  (1) traversal ─▶ (2) Spring4Shell ─▶ (3) web-shell params ─▶ (4) rare UA ─▶ (5) covert HTTP
+  ATTACKER(Kali) ──HTTP exploit──▶ PAN NGFW (EAL + Vuln Protection) ──▶ VICTIM web app
+                                          │
+                                          └── EAL / threat logs ──▶ Cortex XSIAM/XDR
+   (1) traversal ─▶ (2) Spring4Shell ─▶ (3) web-shell params ─▶ (4) rare UA ─▶ (5) covert HTTP
 ```
 
-| # | Stage (ATT&CK tactic) | What the script sends | Enabled EAL alert | Rule id | Technique |
-|---|----------------------|-----------------------|-------------------|---------|-----------|
+| # | Stage (ATT&CK tactic) | What the attacker sends | Enabled EAL alert | Rule id | Technique |
+|---|----------------------|-------------------------|-------------------|---------|-----------|
 | 1 | **Recon → Initial Access** (TA0007/TA0001) | Directory-traversal URIs (`../../etc/passwd`, `%2e%2e`) | **Possible path traversal via HTTP request** | `60da6e16` | T1083 |
 | 2 | **INITIAL ACCESS** (TA0001) | Spring4Shell `class.module.classLoader...` payload | **Suspicious failed HTTP request - Spring4Shell** | `1028c23d` | T1190 |
 | 3 | **Initial Access / Persistence** (TA0001/TA0003) | Web-shell params (`cmd=`, SSTI `{{7*7}}`, `php://filter`) | **Suspicious HTTP parameters detected** | `3508f6b4` | T1133 · T1505.003 |
-| 4 | **Command & Control** (TA0011) | Rare/odd `User-Agent` strings to an external server | **Abnormal rare combination of HTTP User Agent and HTTP Server** | `c13fd72e` | T1102 · T1567 |
+| 4 | **Command & Control** (TA0011) | Rare/odd `User-Agent` to an external server | **Abnormal rare combination of HTTP User Agent and HTTP Server** | `c13fd72e` | T1102 · T1567 |
 | 5 | **C2 / Exfiltration** (TA0011/TA0010) | Odd methods (PUT/PATCH), encoded data in headers/URI | **HTTP with suspicious characteristics** | `7fbfd969` | T1102 · T1567 |
 
-The **initial access is the web exploitation itself** (stages 1–2): Spring4Shell
-is a pattern-based, reliably-triggered EAL alert. Stages 1–3 are also enforced by
-**Vulnerability Protection**, giving firewall **block** actions alongside the EAL
-detections. Every alert maps to an **enabled** rule in your tenant.
+Stages 1–3 are also enforced by **Vulnerability Protection**, giving firewall
+**block** actions alongside the EAL detections.
 
 ---
 
 ## 2. Prerequisites
-
-| Component | Requirement |
-|-----------|-------------|
-| Attacker host | One Windows box, PowerShell 5.1+. Agent installed is fine. |
-| Web server | A lab web app reachable **through** the firewall (any HTTP server; it does not need to be vulnerable — the requests only need to traverse the firewall). Set `TargetWebServer`. |
-| NGFW | Rule covering the host with **Vulnerability Protection** + **URL Filtering** profiles, **EAL enabled**, log forwarding to Cortex. |
-| Cortex | XSIAM/XDR ingesting the firewall EAL/threat logs. |
-
-Use `http://` targets so the firewall reads the URI/headers without decryption.
+- The Kali attacker box up with `attacker/attack-web.sh` present
+  (the orchestrator's `-Provision` copies it, or `scp` it manually).
+- A **web listener on the victim** so the inbound exploit sessions complete — the
+  orchestrator starts a temporary one; or point at any lab web server.
+- Kali must be able to **route to the victim** on the listener port (through the
+  NGFW). EAL enabled + Vuln-Protection/URL profiles + log forwarding to Cortex.
 
 ---
 
 ## 3. Run it
 
-**Double-click `Start-Demo.cmd`** → **[1] Configure** (set your web server) →
-**[2] Preflight → [3] Dry run → [4] Run**. Or manually:
-
+Attacker-driven, via the global orchestrator (starts the victim listener, then
+has Kali run `attack-web.sh`):
 ```powershell
-cd D:\PANW\eal-demo\case-2
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-.\scripts\00-preflight.ps1
-.\scripts\Run-All.ps1 -DryRun
-.\scripts\Run-All.ps1 -PauseBetween
+.\Invoke-AttackLifecycle.ps1 -Cases 2 -DryRun     # show the plan
+.\Invoke-AttackLifecycle.ps1 -Cases 2 -Live       # attacker exploits the victim
+# override the port / victim IP if needed:
+.\Invoke-AttackLifecycle.ps1 -Cases 2 -Live -WebPort 8000 -VictimIP 10.0.0.50
 ```
+On Kali directly: `bash /tmp/attack-web.sh http://<victim>:<port>`.
 
-`[BLOCK]` (magenta) = the firewall/server rejected the request (expected —
-rejection is the signal); `[OK]` = the request went through and was logged.
+**Standalone fallback** (victim-outbound, when Kali can't route back to the
+victim): `case-2\Start-Demo.cmd` runs the same requests from the Windows host to
+a web target you set — still produces the EAL alerts, just with the victim as the
+source.
 
 ---
 
@@ -78,16 +74,12 @@ rejection is the signal); `[OK]` = the request went through and was logged.
 | 4 | Abnormal rare combination of HTTP User Agent and HTTP Server | `c13fd72e` | odd User-Agent to external host |
 | 5 | HTTP with suspicious characteristics | `7fbfd969` | odd method + encoded data |
 
-Also check the NGFW **Monitor ▸ Logs ▸ Threat / URL Filtering** for
-Vulnerability-Protection block actions on stages 1–3. XQL:
-```
-dataset = panw_ngfw_threat_raw | filter category contains "code-execution" or misc contains "traversal" | sort desc _time
-```
-
-See `docs/verification-checklist.md`.
+Firewall block proof: **Monitor ▸ Logs ▸ Threat** — Vuln-Protection resets on
+traversal / Spring4Shell / code-injection. See
+[`docs/verification-checklist.md`](docs/verification-checklist.md).
 
 ---
 
 ## 5. Safety
-Dummy payloads only — no real exploitation. Point `TargetWebServer` at a lab
-server you own/are authorized to test. `DryRun` prints without sending.
+Dummy payloads only — no real exploitation. Attack a lab web server you own /
+are authorized to test. `DryRun` sends nothing.
