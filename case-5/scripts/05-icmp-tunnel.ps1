@@ -33,8 +33,11 @@ foreach ($size in @(1024, 1400, 1472)) {
 }
 
 # (b) Echo to multiple hosts -> Abnormal ICMP echo to multiple hosts
-$hosts = @($cfg.IcmpTarget) + ($cfg.SshServers -split '\s*,\s*' | Where-Object { $_ })
-Write-Stage "ICMP sweep across $($hosts.Count) hosts" "INFO"
+# Strip any :port (SSH entries may be host:port) and de-duplicate.
+$hosts = @($cfg.IcmpTarget) + ($cfg.SshServers -split '\s*,\s*' | Where-Object { $_ } | ForEach-Object { ($_ -split ':')[0] })
+$hosts = $hosts | Where-Object { $_ } | Select-Object -Unique
+Write-Stage "ICMP sweep across $($hosts.Count) host(s)" "INFO"
+if ($hosts.Count -le 1) { Write-Stage "  (all targets resolve to one server - 'ICMP to multiple hosts' needs distinct IPs)" "WARN" }
 foreach ($h in ($hosts | Select-Object -Unique)) {
     if ($cfg.DryRun) { Write-Host "  DRY: ICMP echo -> $h"; continue }
     try { $ping.Send($h, 1000) | Out-Null; Write-Stage "  ICMP echo -> $h" "OK" } catch {}

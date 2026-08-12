@@ -14,7 +14,9 @@ Write-Stage "FTP $($cfg.FtpServer):21 -> $([string]$ftpOk)" $(if($ftpOk){"OK"}el
 $servers = $cfg.SshServers -split '\s*,\s*' | Where-Object { $_ }
 $sshOpen = 0
 foreach ($s in $servers) {
-    if (Test-NetConnection -ComputerName $s -Port $cfg.SshPort -InformationLevel Quiet -WarningAction SilentlyContinue) { $sshOpen++ }
+    $h = $s; $p = $cfg.SshPort
+    if ($s -match '^(.*):(\d+)$') { $h = $Matches[1]; $p = [int]$Matches[2] }
+    if (Test-NetConnection -ComputerName $h -Port $p -InformationLevel Quiet -WarningAction SilentlyContinue) { $sshOpen++ }
 }
 Write-Stage "SSH reachable on $sshOpen of $($servers.Count) servers (port $($cfg.SshPort))" $(if($sshOpen){"OK"}else{"WARN"})
 

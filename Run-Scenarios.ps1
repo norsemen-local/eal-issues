@@ -1,0 +1,124 @@
+<#
+    Run-Scenarios.ps1  --  One orchestrator for all EAL demo cases.
+    ================================================================
+    Auto-fills every case's parameters and runs the scenarios. Internet-facing
+    stages (web / FTP / SSH / ICMP / SMB / exfil) are pointed at your Linux
+    target server; internal AD stages (LDAP / RPC / Kerberos) are auto-detected
+    from this machine's domain membership.
+
+    EXAMPLES
+      # Safe rehearsal - prints every action, sends NO traffic:
+      .\Run-Scenarios.ps1 -DryRun
+
+      # Provision the Linux target, then run everything for real:
+      .\Run-Scenarios.ps1 -SetupServer -Live
+
+      # Just cases 1,2,5 (no AD lab needed) against the server, live:
+      .\Run-Scenarios.ps1 -Cases 1,2,5 -Live
+
+      # Point at a different server / override AD:
+      .\Run-Scenarios.ps1 -TargetServer 1.2.3.4 -DomainController DC01.corp.local -Live
+
+    Default is DryRun-safe: you must pass -Live to actually send traffic.
+#>
+[CmdletBinding()]
+param(
+    [string]  $TargetServer   = "170.187.158.212",
+    [int[]]   $Cases          = @(1,2,3,4,5),
+    [switch]  $Live,                       # actually send traffic (else dry-run)
+    [switch]  $DryRun,                     # explicit dry-run (default when -Live absent)
+    [switch]  $PauseBetween,
+    # ---- Linux target provisioning (optional) ----
+    [switch]  $SetupServer,                # scp+ssh the setup script and start services
+    [string]  $SshUser        = "root",
+    # ---- AD overrides (else auto-detected; cases 3 & 4 only) ----
+    [string]  $Domain,
+    [string]  $DomainController,
+    [string]  $LateralTarget,
+    [string]  $SweepHosts
+)
+
+$ErrorActionPreference = 'Stop'
+$root = $PSScriptRoot
+$isDry = -not $Live -or $DryRun
+function Say($m,$c='Cyan'){ Write-Host $m -ForegroundColor $c }
+
+Say "`n==================================================================" Magenta
+Say "  PANW EAL Demo - scenario orchestrator" Magenta
+Say "  Target server: $TargetServer   Cases: $($Cases -join ',')   Mode: $(if($isDry){'DRY-RUN'}else{'LIVE'})" Magenta
+Say "==================================================================`n" Magenta
+
+# ---------------------------------------------------------------- provision
+if ($SetupServer) {
+    $sh = Join-Path $root 'target-server\setup-target-server.sh'
+    Say "[*] Deploying target services to $SshUser@$TargetServer ..." Yellow
+    try {
+        & scp $sh "${SshUser}@${TargetServer}:/tmp/setup-target-server.sh"
+        & ssh "${SshUser}@${TargetServer}" "sudo bash /tmp/setup-target-server.sh"
+        Say "[+] Target services provisioned." Green
+    } catch {
+        Say "[!] Provisioning failed ($($_.Exception.Message)). Run the script manually on the server." Red
+    }
+}
+
+# ---------------------------------------------------------------- AD detect
+if (3 -in $Cases -or 4 -in $Cases) {
+    if (-not $Domain) { $Domain = $env:USERDNSDOMAIN }
+    if (-not $Domain) { try { $Domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name } catch {} }
+    if (-not $DomainController -and $Domain) {
+        try { $DomainController = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().FindDomainController().Name } catch {}
+        if (-not $DomainController) { $ls = ($env:LOGONSERVER -replace '^\\\\',''); if ($ls -and $Domain) { $DomainController = "$ls.$Domain" } }
+    }
+    if ($Domain) { Say "[*] AD auto-detect: Domain=$Domain  DC=$DomainController" }
+    else { Say "[!] Not domain-joined - cases 3/4 AD stages will use placeholders; set -DomainController to fix." Yellow }
+    if (-not $LateralTarget -and $DomainController) { $LateralTarget = $DomainController }
+    if (-not $SweepHosts -and $DomainController) { $SweepHosts = $DomainController }
+}
+
+# ---------------------------------------------------------- per-case params
+# Only internet-facing stages use the server; AD stages use detected values.
+$web = "http://$TargetServer"
+$overrides = @{
+    1 = @{ TargetWebServer=$web }
+    2 = @{ TargetWebServer=$web; ExternalServer=$web }
+    3 = @{ TargetWebServer=$web }
+    4 = @{ FtpServer=$TargetServer }
+    5 = @{ FtpServer=$TargetServer
+           SshServers="${TargetServer}:2201,${TargetServer}:2202,${TargetServer}:2203"
+           IcmpTarget=$TargetServer
+           SmbShare="\\$TargetServer\share" }
+}
+# Fold in detected/overridden AD values (case 3 uses all four; case 4 uses domain+DC)
+if ($Domain)           { $overrides[3].Domain=$Domain;                     $overrides[4].Domain=$Domain }
+if ($DomainController) { $overrides[3].DomainController=$DomainController; $overrides[4].DomainController=$DomainController }
+if ($LateralTarget)    { $overrides[3].LateralTarget=$LateralTarget }
+if ($SweepHosts)       { $overrides[3].SweepHosts=$SweepHosts }
+
+function Write-CaseLocal([int]$c,[hashtable]$ov) {
+    $path = Join-Path $root "case-$c\config\lab-config.local.ps1"
+    $lines = @("# Auto-generated by Run-Scenarios.ps1 - target=$TargetServer")
+    foreach ($k in $ov.Keys) { $esc = ("" + $ov[$k]) -replace "'", "''"; $lines += "`$Global:EalDemo.$k = '$esc'" }
+    Set-Content -Path $path -Value $lines -Encoding UTF8
+    return $ov
+}
+
+# ------------------------------------------------------------------- run
+foreach ($c in $Cases) {
+    if (-not (Test-Path (Join-Path $root "case-$c"))) { Say "[!] case-$c not found - skipping" Yellow; continue }
+    $ov = Write-CaseLocal $c $overrides[$c]
+    Say "`n------------------------------------------------------------------" White
+    Say "  CASE $c   params: $(( $ov.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join '  ')" White
+    Say "------------------------------------------------------------------" White
+    $runAll = Join-Path $root "case-$c\scripts\Run-All.ps1"
+    $runArgs = @{}
+    if ($isDry)        { $runArgs.DryRun = $true }
+    if ($PauseBetween) { $runArgs.PauseBetween = $true }
+    try { & $runAll @runArgs } catch { Say "  case-$c error: $($_.Exception.Message)" Red }
+}
+
+Say "`n==================================================================" Magenta
+Say "  Done ($(if($isDry){'dry-run - no traffic sent'}else{'live'})). " Green
+Say "  Remember: the attacker host's egress to $TargetServer must traverse" Green
+Say "  your Palo Alto NGFW (with EAL + log forwarding) for the alerts to fire." Green
+Say "  Re-run without -DryRun / with -Live to send real traffic." Green
+Say "==================================================================`n" Magenta

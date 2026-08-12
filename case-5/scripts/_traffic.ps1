@@ -27,9 +27,12 @@ function Invoke-FtpLogin {
 
 function Invoke-SshBanner {
     <# Open a raw TCP connection to an SSH server and optionally send a client
-       banner (used for the downgrade stage). Reads the server banner. #>
+       banner (used for the downgrade stage). Reads the server banner.
+       $Server may be "host" or "host:port"; an explicit host:port overrides -Port
+       (lets one real server expose the same host key on several ports). #>
     param([string]$Server, [int]$Port = 22, [string]$ClientBanner = $null, [string]$Label)
     $cfg = $Global:EalDemo
+    if ($Server -match '^(.*):(\d+)$') { $Server = $Matches[1]; $Port = [int]$Matches[2] }
     if ($cfg.DryRun) {
         $b = if ($ClientBanner) { " send '$ClientBanner'" } else { "" }
         Write-Host "  DRY: SSH connect ${Server}:${Port}$b ($Label)"; return

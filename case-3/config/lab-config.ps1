@@ -17,7 +17,7 @@
 $Global:EalDemo = @{
     AttackerHostname = $env:COMPUTERNAME
 
-    TargetWebServer  = "http://192.0.2.80"         # initial-access web foothold (stage 1)
+    AttackerC2       = "170.187.158.212"           # Kali attacker / C2 (phishing IA + C2)
     DomainController = "DC01.corp.local"
     LateralTarget    = "FS01.corp.local"          # DCOM / WinRM / SchedTask target
     # Hosts swept by the RPC-recon stages (comma-separated). More hosts = more
@@ -29,13 +29,13 @@ $Global:EalDemo = @{
 
     _Title = "PANW EAL Demo - Case 3 : Web Foothold -> Windows Lateral Movement"
     _ConfigFields = @(
-        @{ Key='TargetWebServer';  Prompt='Initial-access web server (http://host)' }
+        @{ Key='AttackerC2';       Prompt='Attacker/C2 host (Kali)' }
         @{ Key='DomainController'; Prompt='Domain Controller' }
         @{ Key='LateralTarget';    Prompt='DCOM/WinRM/SchedTask target host' }
         @{ Key='SweepHosts';       Prompt='RPC-sweep hosts (comma-separated)' }
     )
     _StageMap = @{
-        1 = @{ File="01-initial-access-web.ps1"; Title="Initial Access - web shell foothold" }
+        1 = @{ File="01-initial-access.ps1"; Title="Initial Access - phishing / drive-by (victim->attacker)" }
         2 = @{ File="02-rpc-sweep.ps1";          Title="Discovery - RPC sweep (multiple hosts)" }
         3 = @{ File="03-sensitive-rpc.ps1";      Title="Sensitive RPC to multiple hosts" }
         4 = @{ File="04-dcom.ps1";               Title="Lateral - DCOM object activation" }

@@ -21,7 +21,7 @@
 $Global:EalDemo = @{
     AttackerHostname = $env:COMPUTERNAME
 
-    FtpServer        = "10.0.0.30"                 # initial-access brute target
+    AttackerC2       = "170.187.158.212"           # Kali attacker / C2 (phishing IA)
     Domain           = "corp.local"
     DomainController = "DC01.corp.local"
     WpadHost         = "wpad"
@@ -31,12 +31,12 @@ $Global:EalDemo = @{
 
     _Title = "PANW EAL Demo - Case 4 : Identity Compromise & AD Domination"
     _ConfigFields = @(
-        @{ Key='FtpServer';        Prompt='Initial-access FTP/brute target host' }
+        @{ Key='AttackerC2';       Prompt='Attacker/C2 host (Kali)' }
         @{ Key='Domain';           Prompt='AD domain (FQDN)' }
         @{ Key='DomainController'; Prompt='Domain Controller' }
     )
     _StageMap = @{
-        1 = @{ File="01-initial-access-ftp.ps1"; Title="Initial Access - FTP brute force" }
+        1 = @{ File="01-initial-access.ps1"; Title="Initial Access - phishing / drive-by (victim->attacker)" }
         2 = @{ File="02-ldap-enum.ps1";          Title="Discovery - LDAP enumeration" }
         3 = @{ File="03-wpad.ps1";               Title="Credential Access - WPAD (AITM)" }
         4 = @{ File="04-efsrpc.ps1";             Title="Credential Access - EFSRPC coercion (PetitPotam)" }

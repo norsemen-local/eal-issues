@@ -13,7 +13,8 @@
 $Global:EalDemo = @{
     AttackerHostname = $env:COMPUTERNAME
 
-    FtpServer        = "10.0.0.30"                       # FTP server (stages 1-2)
+    AttackerC2       = "170.187.158.212"                 # Kali attacker / C2 (phishing IA + exfil)
+    FtpServer        = "170.187.158.212"                 # attacker FTP (exfil drop)
     # SSH servers for the multi-server / downgrade stages (comma-separated).
     SshServers       = "10.0.0.31,10.0.0.32,10.0.0.33"
     SshPort          = 22
@@ -33,8 +34,8 @@ $Global:EalDemo = @{
         @{ Key='SmbShare';   Prompt='SMB share for exfil (\\host\share)' }
     )
     _StageMap = @{
-        1 = @{ File="01-ftp-anonymous.ps1";  Title="Initial Access - FTP anonymous/default login" }
-        2 = @{ File="02-ftp-bruteforce.ps1"; Title="Multiple suspicious FTP login attempts" }
+        1 = @{ File="01-initial-access.ps1"; Title="Initial Access - phishing / drive-by (victim->attacker)" }
+        2 = @{ File="02-ftp-bruteforce.ps1"; Title="Exfil staging - FTP anon + brute to attacker" }
         3 = @{ File="03-ssh-uncommon.ps1";   Title="SSH to multiple uncommon servers" }
         4 = @{ File="04-ssh-downgrade.ps1";  Title="SSH protocol downgrade" }
         5 = @{ File="05-icmp-tunnel.ps1";    Title="ICMP covert channel / anomalies" }

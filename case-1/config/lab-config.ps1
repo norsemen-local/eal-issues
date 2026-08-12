@@ -19,7 +19,9 @@
 $Global:EalDemo = @{
     AttackerHostname = $env:COMPUTERNAME
 
-    # Initial access: a lab web server reachable THROUGH the firewall (http://).
+    # Attacker / C2 host (the Kali box) - phishing + C2 + exfil destination.
+    AttackerC2       = "170.187.158.212"
+    # (legacy) web target - unused now that initial access is client-side phishing.
     TargetWebServer  = "http://192.0.2.80"
 
     # C2 / exfil analytics
@@ -42,7 +44,7 @@ $Global:EalDemo = @{
         @{ Key='RareDomain';      Prompt='Rare exfil domain' }
     )
     _StageMap = @{
-        1 = @{ File="01-initial-access-web.ps1"; Title="Initial Access - web exploit (Spring4Shell)" }
+        1 = @{ File="01-initial-access.ps1"; Title="Initial Access - phishing / drive-by (victim->attacker)" }
         2 = @{ File="02-dga-domains.ps1";        Title="C2 - DGA / random-looking domains" }
         3 = @{ File="03-dns-tunneling.ps1";      Title="C2 - DNS tunneling" }
         4 = @{ File="04-suspicious-dns.ps1";     Title="C2 - suspicious / failed DNS" }
