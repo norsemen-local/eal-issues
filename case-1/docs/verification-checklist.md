@@ -1,43 +1,63 @@
-# Verification checklist — Case 1
+# Verification checklist — Case 1 (firewall detect & block)
 
-Use this after running `Run-All.ps1` to confirm each EAL-log analytics alert
-fired in Cortex XSIAM / XDR. Detectors are behavioural and may take ~10–60 min.
+Run `Run-All.ps1` (or `Start-Demo.cmd` → [4]), then confirm each **firewall**
+threat/URL log appears in Cortex XSIAM/XDR. Firewall logs are near real-time.
 
-## Alert-by-alert
+## Firewall-sourced alerts to confirm
 
-| ✓ | Stage | Alert name (search in Cortex) | Sev | ATT&CK | How to confirm |
-|---|-------|-------------------------------|-----|--------|----------------|
-| ☐ | 1 | Random-Looking Domain Names | Medium | T1568.002 | Alert lists many random root domains from the attacker host |
-| ☐ | 1 | DNS Tunneling | Low | T1071 / T1048 | Parent domain = `tunnel.<DgaRootDomain>`, >10 KB in 10 min |
-| ☐ | 2 | Rare LDAP enumeration | Low | T1087 | LDAP/389 attacker → DC, unusual query combination |
-| ☐ | 3 | Weakly-Encrypted Kerberos TGT Response | Info | T1556.001 | RC4 / etype 23 Kerberos ticket toward the DC |
-| ☐ | 3 | Rare NTLM Usage by User | Info | T1550 | Lab user's first NTLM auth in 30 days, target by IP |
-| ☐ | 4 | Rare Scheduled Task RPC activity | Info | T1021 / T1053 | ATTACKER → lateral target, scheduled-task RPC |
-| ☐ | 4 | Rare Remote Service (SVCCTL) RPC activity | Info | T1021 | ATTACKER → lateral target, SCM RPC |
-| ☐ | 5 | Massive upload to a rare storage or mail domain | Info | T1567.002 | Large outbound transfer to the rare storage domain |
+| ✓ | Stage | Firewall alert (search in Cortex / NGFW Monitor) | Action | ATT&CK |
+|---|-------|--------------------------------------------------|--------|--------|
+| ☐ | 1 | URL Filtering — **phishing** | block | T1566 |
+| ☐ | 1 | URL Filtering — **malware** | block | T1189 |
+| ☐ | 1 | Antivirus — virus *(only if EICAR enabled)* | reset-both | T1204 |
+| ☐ | 2 | URL Filtering — **command-and-control** | block | T1071 |
+| ☐ | 2 | DNS Security — `test-c2.testpanw.com` | **sinkhole** | T1071 |
+| ☐ | 3 | DNS Security — `test-dga` (DGA) | sinkhole/alert | T1568.002 |
+| ☐ | 3 | DNS Security — `test-dnstun` (DNS tunneling) | sinkhole/alert | T1071.004 |
+| ☐ | 3 | DNS Security — `test-ddns` / `test-fastflux` | alert | T1568 |
+| ☐ | 4 | DNS Security — `test-malware` / `test-ransomware` | sinkhole | T1105/T1486 |
+| ☐ | 4 | DNS Security — `test-nrd` (newly-registered) | alert | T1608 |
+| ☐ | 4 | URL Filtering — **high-risk** | alert/block | T1608 |
+| ☐ | 5 | DNS Security — `test-dns-infiltration` | sinkhole | T1048 |
+| ☐ | 5 | DNS Security — `test-proxy` (anonymizer) | alert/block | T1048 |
 
-## If an alert does NOT appear
+## Two-place proof (firewall, not agent)
 
-1. **Timing** — most analytics run on a schedule; wait up to an hour. DNS
-   Tunneling evaluates a 10-minute window; re-run stage 1 if needed.
-2. **Data source** — in Cortex, confirm the **PAN Firewall EAL** source is
-   ingesting (Settings ▸ Data Sources). Check the raw logs contain the traffic
-   (XQL: `dataset = panw_ngfw_traffic_raw` / DNS / threat as applicable).
-3. **Analytics/ITDR enabled** — Kerberos & NTLM detectors need the **ITDR /
-   Identity Analytics** module active.
-4. **Baseline "rarity"** — these detectors fire on *anomalies*. In a brand-new
-   tenant with no baseline, or a very noisy one, sensitivity differs. Re-running
-   from a host that has never done this activity helps.
-5. **EAL enabled on the NGFW** — Enhanced Application Logging must be on and the
-   log-forwarding profile attached to the rules covering the lab segments.
-6. **Firewall actually in path** — verify the attacker→DC and attacker→internet
-   traffic traverses the PAN firewall (not a direct L2 path).
+1. **On the NGFW:** *Monitor ▸ Logs ▸ Threat* and *URL Filtering* — the events
+   above appear with `action = sinkhole / block / reset`. This is the firewall's
+   own record.
+2. **In Cortex:** the corresponding alerts list **Palo Alto Networks NGFW** as
+   the source (not an endpoint/agent story). XQL:
+   ```
+   dataset = panw_ngfw_threat_raw
+   | filter action in ("sinkhole","block-url","reset-both","drop")
+   | fields _time, misc, category, action, src_ip, dst_ip
+   | sort desc _time
+   ```
 
-## Demo talk-track (suggested)
+## If a firewall alert does NOT appear
 
-1. Land the implant → **C2 alerts** (DGA + tunnel) prove egress detection.
-2. Show **LDAP recon** → attacker is mapping AD.
-3. Show **Kerberoast + NTLM** → credential theft without touching the endpoint.
-4. Show **RPC lateral movement** → spread to a second host.
-5. Show **massive upload** → data leaving the org.
-6. Open the **incident/causality view** → one stitched story, MITRE-mapped.
+1. **Path** — confirm the host's DNS + HTTP actually traverse the PAN firewall
+   (not a local resolver / direct egress). Run `00-preflight.ps1`.
+2. **Profiles attached** — the security rule for the host must have Anti-Spyware
+   (DNS Security), URL Filtering and Antivirus profiles attached, with the
+   actions from README §4.
+3. **Subscriptions** — DNS Security and Advanced URL Filtering must be licensed
+   and active, or the test domains/pages won't be categorized.
+4. **HTTP vs HTTPS** — URL test pages must be fetched over `http://` unless SSL
+   decryption is enabled (config uses http by default).
+5. **Log forwarding** — a Log Forwarding profile must send Threat/URL logs to
+   Cortex and be attached to the rule; check the NGFW logs first to isolate
+   "firewall didn't act" vs "didn't reach Cortex".
+6. **Sinkhole label** — the script prints `[BLOCK]` only when the answer matches
+   the default sinkhole IP (72.5.65.x). A custom sinkhole IP still generates the
+   firewall log — verify in Monitor ▸ Logs ▸ Threat.
+
+## Demo talk-track
+
+1. Land on a phishing/malware page → **URL Filtering blocks** (stage 1).
+2. Implant beacons → **URL C2 block + DNS C2 sinkhole** (stage 2).
+3. Malware rotates domains / tunnels DNS → **DNS Security sinkholes** (stage 3).
+4. Second-stage/ransomware pull → **DNS + URL blocks** (stage 4).
+5. Exfil over DNS / anonymizer → **DNS Security sinkholes** (stage 5).
+6. Open the NGFW Threat log + the XSIAM incident → one firewall-caught kill chain.

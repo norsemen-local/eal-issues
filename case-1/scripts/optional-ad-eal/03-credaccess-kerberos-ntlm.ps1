@@ -1,4 +1,4 @@
-<#
+﻿<#
     Stage 3 - Credential Access
     ===========================
     Two behaviours the EAL Kerberos/NTLM analytics key on:
@@ -15,7 +15,7 @@
     Requires: a reachable DC + at least one SPN service account in the lab.
 #>
 param([switch]$DryRun)
-. "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\..\..\config\lab-config.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
 
@@ -70,3 +70,4 @@ if ($cfg.DryRun) {
     }
 }
 Write-Stage "STAGE 3 done. Expect: 'Weakly-Encrypted Kerberos TGT Response' + 'Rare NTLM Usage by User'." "OK"
+

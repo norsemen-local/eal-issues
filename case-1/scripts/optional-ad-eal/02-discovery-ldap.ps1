@@ -1,4 +1,4 @@
-<#
+﻿<#
     Stage 2 - Discovery
     ===================
     Simulates Active Directory reconnaissance from the attacker host by
@@ -12,7 +12,7 @@
     Uses only native .NET DirectorySearcher - no external tools.
 #>
 param([switch]$DryRun)
-. "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\..\..\config\lab-config.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
 
@@ -51,3 +51,4 @@ foreach ($q in $queries) {
     Start-Sleep -Milliseconds $cfg.DelayBetweenReqMs
 }
 Write-Stage "STAGE 2 done. Expect: 'Rare LDAP enumeration'." "OK"
+

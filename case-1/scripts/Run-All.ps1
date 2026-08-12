@@ -18,17 +18,20 @@ param(
 
 . "$PSScriptRoot\..\config\lab-config.ps1"
 
-$map = [ordered]@{
-    1 = @{ File="01-c2-dga-dns.ps1";            Title="Initial Access / C2" }
-    2 = @{ File="02-discovery-ldap.ps1";        Title="Discovery" }
-    3 = @{ File="03-credaccess-kerberos-ntlm.ps1"; Title="Credential Access" }
-    4 = @{ File="04-lateral-rpc.ps1";           Title="Lateral Movement" }
-    5 = @{ File="05-exfil-upload.ps1";          Title="Exfiltration" }
+# NOTE: plain hashtable (not [ordered]) so $map[$s] is KEY lookup, not position.
+# Execution order comes from $Stages, so we don't need insertion order here.
+$map = @{
+    1 = @{ File="01-initial-access-url.ps1";  Title="Initial Access (URL Filtering + AV)" }
+    2 = @{ File="02-command-control.ps1";     Title="Command & Control (URL + DNS sinkhole)" }
+    3 = @{ File="03-dga-dns-tunneling.ps1";   Title="DGA / DNS Tunneling (DNS Security)" }
+    4 = @{ File="04-malware-ransomware.ps1";  Title="Malware/Ransomware Staging (DNS + URL)" }
+    5 = @{ File="05-exfiltration-dns.ps1";    Title="Exfiltration (DNS + anonymizer)" }
 }
 
 Write-Host "`n============================================================" -ForegroundColor Magenta
-Write-Host "  PANW EAL Demo - Case 1 : AD intrusion -> exfiltration" -ForegroundColor Magenta
-Write-Host "  Stages to run: $($Stages -join ', ')   DryRun=$DryRun" -ForegroundColor Magenta
+Write-Host "  PANW Firewall Demo - Case 1 : detect & BLOCK the kill chain" -ForegroundColor Magenta
+Write-Host "  All traffic uses Palo Alto benign test resources (*.testpanw.com," -ForegroundColor Magenta
+Write-Host "  urlfiltering.paloaltonetworks.com). Stages: $($Stages -join ', ')  DryRun=$DryRun" -ForegroundColor Magenta
 Write-Host "============================================================`n" -ForegroundColor Magenta
 
 $start = Get-Date
@@ -50,6 +53,7 @@ foreach ($s in $Stages) {
 $dur = [int]((Get-Date) - $start).TotalSeconds
 Write-Host "`n============================================================" -ForegroundColor Magenta
 Write-Host "  Attack chain complete in ${dur}s." -ForegroundColor Green
-Write-Host "  Now open Cortex XSIAM/XDR and watch the Incidents/Alerts." -ForegroundColor Green
-Write-Host "  Analytics detectors typically surface within ~10-60 min." -ForegroundColor Green
+Write-Host "  Firewall THREAT logs (DNS/URL block+sinkhole) appear in XSIAM in" -ForegroundColor Green
+Write-Host "  near real-time (minutes). Filter Alerts by Source = Palo Alto NGFW." -ForegroundColor Green
+Write-Host "  Verify on the NGFW too: Monitor > Logs > Threat / URL Filtering." -ForegroundColor Green
 Write-Host "============================================================`n" -ForegroundColor Magenta

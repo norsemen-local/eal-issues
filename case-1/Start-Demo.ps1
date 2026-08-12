@@ -159,21 +159,19 @@ function Invoke-Chain {
 
 function Show-Menu {
     Clear-Host
-    $adm = if (Test-Admin) { 'elevated' } else { 'NOT elevated (stage 4 needs admin)' }
     Write-Host "============================================================" -ForegroundColor Magenta
-    Write-Host "   PANW EAL Demo - Case 1 : guided launcher" -ForegroundColor Magenta
-    Write-Host "   Domain: $($cfg.Domain)   DC: $($cfg.DomainController)"    -ForegroundColor DarkGray
-    Write-Host "   Target: $($cfg.LateralTarget)   Session: $adm"           -ForegroundColor DarkGray
+    Write-Host "   PANW Firewall Demo - Case 1 : detect & BLOCK the kill chain" -ForegroundColor Magenta
+    Write-Host "   Attacker host: $($cfg.AttackerHostname)"                     -ForegroundColor DarkGray
+    Write-Host "   Traffic = Palo Alto benign test resources (no AD lab needed)" -ForegroundColor DarkGray
     Write-Host "============================================================" -ForegroundColor Magenta
     Write-Host ""
-    Write-Host "  [A] Auto-detect settings from THIS machine (recommended)" -ForegroundColor Green
-    Write-Host "  [1] Configure lab settings manually (no file editing)"
-    Write-Host "  [2] Preflight - check connectivity"
-    Write-Host "  [3] Dry run  - print the whole chain, send NO traffic"
-    Write-Host "  [4] RUN full attack chain (pause between stages)"
-    Write-Host "  [5] Run C2 + Exfil only  (stages 1 & 5, no AD lab needed)"
-    Write-Host "  [6] Run a single stage..."
-    Write-Host "  [7] Show expected Cortex alerts (README section 6)"
+    Write-Host "  [2] Preflight  - check firewall/DNS/HTTP reachability" -ForegroundColor Green
+    Write-Host "  [3] Dry run    - print the whole chain, send NO traffic"
+    Write-Host "  [4] RUN full attack chain (pause between stages)" -ForegroundColor Green
+    Write-Host "  [5] Run a single stage..."
+    Write-Host "  [6] Show expected firewall alerts (README section 6)"
+    Write-Host "  --"
+    Write-Host "  [1] Configure / [A] Auto-detect  (only for the optional AD add-on)" -ForegroundColor DarkGray
     Write-Host "  [Q] Quit"
     Write-Host ""
 }
@@ -187,14 +185,8 @@ function Show-Expected {
     Pause-Return
 }
 
-# First run (no saved settings yet): offer to auto-detect straight away.
-if (-not (Test-Path $localCfg)) {
-    Write-Host "`nNo saved settings found for this machine." -ForegroundColor Yellow
-    if ((Read-Host "Auto-detect domain/DC/target from this machine now? [Y/n]").Trim().ToUpper() -ne 'N') {
-        Invoke-AutoDetect; Pause-Return
-    }
-}
-
+# The firewall-block demo needs NO configuration - just run it. Auto-detect is
+# only for the optional AD/EAL behavioural add-on, so we don't prompt for it.
 do {
     Show-Menu
     switch ((Read-Host "Choose").Trim().ToUpper()) {
@@ -202,17 +194,13 @@ do {
         '1' { Save-Config }
         '2' { & (Join-Path $scripts '00-preflight.ps1'); Pause-Return }
         '3' { Invoke-Chain -Stages @(1,2,3,4,5) -DryRun }
-        '4' {
-                if (-not (Test-Admin)) { Write-Stage "Heads-up: not elevated, stage 4 may fail." "WARN" }
-                Invoke-Chain -Stages @(1,2,3,4,5) -PauseBetween
-             }
-        '5' { Invoke-Chain -Stages @(1,5) -PauseBetween }
-        '6' {
+        '4' { Invoke-Chain -Stages @(1,2,3,4,5) -PauseBetween }
+        '5' {
                 $s = Read-Host "Stage number (1-5)"
                 if ($s -match '^[1-5]$') { Invoke-Chain -Stages @([int]$s) -PauseBetween }
                 else { Write-Stage "Not a valid stage." "WARN"; Pause-Return }
              }
-        '7' { Show-Expected }
+        '6' { Show-Expected }
         'Q' { break }
         default { }
     }

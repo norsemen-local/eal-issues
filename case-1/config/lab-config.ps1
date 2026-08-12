@@ -1,70 +1,67 @@
 <#
-    lab-config.ps1  --  Central configuration for the EAL Demo (Case 1)
-    ------------------------------------------------------------------
-    Edit the values below to match YOUR lab, then dot-source this file
-    from any stage script:  . .\config\lab-config.ps1
+    lab-config.ps1  --  Central configuration for the EAL/Threat-Prevention Demo
+    ----------------------------------------------------------------------------
+    This demo is FIREWALL-CENTRIC: it drives the attack traffic through a Palo
+    Alto NGFW so the firewall itself DETECTS (alert) and BLOCKS (sinkhole/reset/
+    drop) it, producing firewall THREAT logs in Cortex XSIAM/XDR. Those logs are
+    100% firewall-sourced and are NOT shadowed by the XDR agent - so it does not
+    matter that every host is onboarded to the agent.
 
-    Every value has a safe default so the DNS/exfil stages run even on a
-    standalone box. The AD stages (2-4) need a reachable Domain Controller.
+    All traffic uses Palo Alto Networks' OFFICIAL, 100% benign test resources:
+      - DNS Security test domains .......... *.testpanw.com
+      - URL Filtering test pages ........... urlfiltering.paloaltonetworks.com
+    No malware, no exploitation, no real C2. Edit values below if needed.
+
+    Start-Demo.ps1 'Auto-detect' / 'Configure' persists overrides to
+    lab-config.local.ps1 (loaded last). Scripts read everything from $cfg.
 #>
 
 $Global:EalDemo = @{
 
-    # ----- Active Directory lab -------------------------------------------
-    # FQDN of the domain and the Domain Controller that the attacker host
-    # will query. Stages 2-4 send LDAP / Kerberos / RPC traffic *to* this DC.
-    Domain            = "corp.local"
-    DomainController  = "DC01.corp.local"          # hostname or IP of the DC
-    DCIpAddress       = "10.0.0.10"
-
-    # A second internal host used as the lateral-movement target for the
-    # Scheduled-Task / SVCCTL RPC stage (can be the same as the DC in a
-    # minimal lab, but a member server is more realistic).
-    LateralTarget     = "FS01.corp.local"
-    LateralTargetIp   = "10.0.0.20"
-
-    # Domain credentials used ONLY to authenticate the simulated recon /
-    # lateral traffic. Use a low-privilege lab account. Leave blank to run
-    # under the current logged-on user's context.
-    LabUser           = "corp\\analyst"
-    LabPassword       = ""                          # filled at runtime / prompt
-
     # ----- Attacker identity ----------------------------------------------
     AttackerHostname  = $env:COMPUTERNAME
 
-    # ----- C2 / DGA simulation (Stage 1) ----------------------------------
-    # Root domain under which random subdomains are generated. In a real
-    # demo point this at a domain you control (so lookups resolve) or leave
-    # it as-is to generate NXDOMAIN traffic the firewall still logs.
-    DgaRootDomain     = "demo-c2-lab.net"
-    DgaLookupCount    = 60                           # number of random domains
-    TunnelDomain      = "tunnel.demo-c2-lab.net"     # DNS-tunnel parent domain
-    TunnelKilobytes   = 15                           # >10 KB in 10 min triggers
+    # ----- URL Filtering test pages (Stage 1,2,4) -------------------------
+    # MUST be http:// (not https) unless SSL decryption is enabled, otherwise
+    # the firewall cannot read the URL path and won't categorize the test page.
+    UrlFilterBase     = "http://urlfiltering.paloaltonetworks.com"
 
-    # ----- Exfil simulation (Stage 5) -------------------------------------
-    # A "rare" storage/mail-style domain to receive a large upload. Use an
-    # endpoint you control (e.g. a test bucket / webhook). The demo posts
-    # dummy data only.
-    ExfilUrl          = "https://rare-storage-demo.example-upload.net/upload"
-    ExfilMegabytes    = 40                           # size of dummy payload
+    # ----- DNS Security test domains (all stages) -------------------------
+    # Resolving these makes the firewall's DNS Security categorize the query
+    # and apply the Anti-Spyware DNS policy action (alert / sinkhole / block).
+    DnsTestDomain     = "testpanw.com"
+
+    # ----- Optional: EICAR AV test (Stage 1) ------------------------------
+    # Downloads the industry-standard EICAR test string so Antivirus/WildFire
+    # blocks it. Requires SSL decryption if the source is https. Off by default.
+    EnableEicar       = $false
+    EicarUrl          = "http://www.eicar.org/download/eicar.com.txt"
 
     # ----- Behaviour ------------------------------------------------------
-    DelayBetweenReqMs = 250                          # pacing between requests
-    DryRun            = $false                        # $true = print, don't send
+    HttpTimeoutSec    = 15
+    DnsQueriesPerName = 3            # repeat each test lookup a few times
+    DelayBetweenReqMs = 400          # pacing between requests
+    DryRun            = $false        # $true = print actions, send NO traffic
+
+    # ----- Optional AD/EAL behavioural add-on (advanced) ------------------
+    # The original behavioural-analytics stages (LDAP/Kerberos/RPC) still exist
+    # but are OPTIONAL now - with an agent on every host they get attributed to
+    # the endpoint. Left here for a full AD lab; not needed for the FW demo.
+    Domain            = "corp.local"
+    DomainController  = "DC01.corp.local"
+    LateralTarget     = "FS01.corp.local"
+    LabUser           = "corp\\analyst"
 }
 
 function Write-Stage {
     param([string]$Msg, [string]$Level = "INFO")
     $ts = (Get-Date).ToString("HH:mm:ss")
-    $color = switch ($Level) { "OK" {"Green"} "WARN" {"Yellow"} "ERR" {"Red"} default {"Cyan"} }
+    $color = switch ($Level) { "OK" {"Green"} "WARN" {"Yellow"} "ERR" {"Red"} "BLOCK" {"Magenta"} default {"Cyan"} }
     Write-Host "[$ts][$Level] $Msg" -ForegroundColor $color
 }
 
 # ----- Local overrides -----------------------------------------------------
-# Start-Demo.ps1 'Configure' writes lab-config.local.ps1 with lines like
-#   $Global:EalDemo.DomainController = 'DC01.corp.local'
-# so your settings survive without editing this file. Loaded last = wins.
 $__local = Join-Path $PSScriptRoot 'lab-config.local.ps1'
 if (Test-Path $__local) { . $__local }
 
-Write-Stage "Loaded lab-config for domain '$($Global:EalDemo.Domain)' (attacker=$($Global:EalDemo.AttackerHostname))" "OK"
+Write-Stage "Loaded firewall-demo config (attacker=$($Global:EalDemo.AttackerHostname))" "OK"

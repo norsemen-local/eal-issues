@@ -5,70 +5,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A **detection-engineering / SE demo**, not a shipping application. It drives a
-5-stage MITRE ATT&CK attack chain (initial access → discovery → credential
-access → lateral movement → exfiltration) from a Windows attacker host so that a
-Palo Alto Networks NGFW logs the traffic as **EAL (Enhanced Application) logs**
-and Cortex XSIAM/XDR raises the matching **analytics alerts**. The scripts
-generate *network traffic patterns only* — no exploitation, no malware, dummy
-payloads — and are designed to run on Windows/PowerShell.
+5-stage MITRE ATT&CK attack chain (initial access → C2 → DGA/DNS-tunneling →
+malware/ransomware staging → exfiltration) from a single Windows host so that a
+**Palo Alto Networks NGFW itself detects and BLOCKS** the traffic (DNS Security
+sinkhole, URL Filtering block, Antivirus reset) and Cortex XSIAM/XDR shows the
+resulting **firewall threat/URL logs**.
 
-The single source of truth for which alerts each stage must produce is the
-stage→tactic→alert table in `README.md` §1, derived from the Cortex docs at
-`cortex-docs.paloaltonetworks.com/.../palo-alto-networks-firewall-eal-logs`.
+**Key design decision (do not regress):** the demo is *firewall-enforcement*
+centric, not *behavioural-analytics* centric. Firewall Threat-Prevention logs are
+unambiguously firewall-sourced and are **not shadowed by the Cortex XDR agent**,
+so the demo works even when every lab host runs the agent. See `README.md` §8.
+All traffic uses Palo Alto's **official benign test resources** — the
+`*.testpanw.com` DNS Security test domains and the
+`urlfiltering.paloaltonetworks.com` URL Filtering test pages — never real
+malware/C2. The exact FQDNs/categories are the source of truth in `README.md` §1.
+
+The earlier AD behavioural-analytics stages (EAL "Rare LDAP enumeration",
+Kerberoast, RPC) live under `scripts/optional-ad-eal/` as an optional add-on;
+they get attributed to the endpoint agent and are **not** the primary demo.
 
 ## Running
 
-The intended entry point is **`Start-Demo.cmd`** (double-click / run as admin):
-it self-elevates, sets the execution policy, and opens `Start-Demo.ps1`, a menu
-that wraps auto-detect / configure / preflight / dry-run / run. On first launch
-(no local config yet) it offers **auto-detect** (`Invoke-AutoDetect`), which reads
-domain / DC+IP / current user / a non-DC member server (RPC/135) straight off the
-machine and can't know only the external C2/exfil endpoints. Both auto-detect and
-manual "Configure" persist via `Write-LocalConfig` to `config/lab-config.local.ps1`
-(per-machine overrides that `lab-config.ps1` dot-sources last), so users never
-hand-edit config. `$script:PersistKeys` is the single list of saved fields — add
-to it when a new configurable value should survive across runs. Underneath,
-everything is still the scripts below — keep them runnable standalone:
+Entry point is **`Start-Demo.cmd`** (double-click) → `Start-Demo.ps1` menu
+(preflight / dry-run / run / single-stage / show-expected). The firewall demo
+needs **no configuration** — test resources are built into `lab-config.ps1`.
+Under the hood it's just the scripts; keep them runnable standalone:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-.\scripts\00-preflight.ps1              # verify DNS/DC/LDAP/RPC reachability
+.\scripts\00-preflight.ps1              # verify DNS/HTTP egress via the firewall
 .\scripts\Run-All.ps1 -DryRun           # print every action, send NO traffic
 .\scripts\Run-All.ps1 -PauseBetween     # full chain, pause between stages
-.\scripts\Run-All.ps1 -Stages 1,5       # subset (1 & 5 need no AD lab)
-.\scripts\01-c2-dga-dns.ps1 -DryRun     # any stage runs standalone
+.\scripts\Run-All.ps1 -Stages 2,3       # any subset
+.\scripts\03-dga-dns-tunneling.ps1      # any stage runs standalone
 ```
 
 There is **no build/lint/test toolchain**. "Testing" a change means: syntax-check
 with `[System.Management.Automation.PSParser]::Tokenize(...)`, then run the
-affected stage with `-DryRun` to confirm the traffic it *would* send. Never
-validate by sending live traffic unless the user is running a real lab.
+affected stage (or `Run-All.ps1`) with `-DryRun`. Live-fire only in a real lab
+behind a PAN firewall. Note: `Run-All.ps1`'s `$map` MUST be a plain `@{}`
+hashtable (keyed by int), **not** `[ordered]@{}` — an ordered dictionary indexes
+by position, which silently shifts stages off-by-one.
 
 ## Architecture / conventions to preserve
 
-- **Every stage script is self-contained and idempotent in the same shape:**
-  `param([switch]$DryRun)` → dot-source `..\config\lab-config.ps1` →
-  `if ($DryRun) { $cfg.DryRun = $true }` → do work gated on `$cfg.DryRun` →
-  end with a `Write-Stage "... Expect: '<alert names>'"` line. When adding a
-  stage, follow this contract and add it to the `$map` in `Run-All.ps1`.
-- **All configuration lives in `config/lab-config.ps1`** as the single
-  `$Global:EalDemo` hashtable (domain, DC, lateral target, credentials, payload
-  sizes, pacing, `DryRun`). Scripts must read from `$cfg`, never hard-code lab
-  values. `Write-Stage` (the shared logger) is also defined here.
-- **`DryRun` must stay honored on every code path that emits traffic** — it is
-  the safety mechanism that lets the demo be rehearsed. Any new network call
-  needs a `if ($cfg.DryRun) { ... } else { ... }` guard.
-- **Failures are expected and non-fatal by design:** NXDOMAIN on DGA lookups,
-  rejected exfil uploads, and missing admin rights all still generate the
-  firewall-observable traffic that is the actual signal — swallow/warn rather
-  than throw, and keep the note about *why the failing call still counts*.
-- **Stages 1 & 5 are DNS/HTTPS-only** (work on a standalone box); stages 2–4
-  require a reachable DC and a lateral target where the lab account is admin.
-  Keep that split intact so the demo degrades gracefully without a full AD lab.
+- **Every stage script has the same shape:** `param([switch]$DryRun)` →
+  dot-source `..\config\lab-config.ps1` → dot-source `_traffic.ps1` →
+  `if ($DryRun) { $cfg.DryRun = $true }` → call `Invoke-TestUrl` /
+  `Invoke-TestDns` / `Invoke-EicarDownload` → end with `Write-Stage "... Expect
+  FIREWALL: ..."` lines. New stage → follow this and add it to `$map` in
+  `Run-All.ps1` (int key = stage number).
+- **`scripts/_traffic.ps1`** holds the only traffic generators. They honour
+  `$cfg.DryRun`, treat a firewall **block/sinkhole/failure as success** (log it
+  `[BLOCK]`, never throw — the block is the signal), and log `[OK]` when traffic
+  was only categorized/alerted. Keep that "failure still counts" behaviour.
+- **All configuration is the single `$Global:EalDemo` hashtable** in
+  `config/lab-config.ps1` (URL test base, DNS test domain, pacing, `DryRun`,
+  EICAR toggle). Scripts read from `$cfg`, never hard-code. `Write-Stage` (shared
+  logger, incl. the `BLOCK`/magenta level) is defined here. `lab-config.local.ps1`
+  is dot-sourced last for optional overrides.
+- **`DryRun` must stay honored on every traffic-emitting path** — it's the
+  rehearsal safety mechanism.
+- **URL test pages use `http://`** (not https) by default so the firewall can
+  read the path without decryption. Don't switch to https without noting the
+  decryption requirement.
 
-## When editing alert mappings
+## When editing stage/alert mappings
 
-`README.md` §1/§6 and `docs/verification-checklist.md` must stay in sync with the
-`Write-Stage "... Expect ..."` strings in the scripts and with the official alert
-names/severities/technique IDs from the Cortex EAL-logs docs. If you change what
-a stage does, update all three places together.
+`README.md` §1/§6, `docs/verification-checklist.md`, and the `Write-Stage "...
+Expect FIREWALL ..."` strings in the scripts must stay in sync — same test
+domains/categories, firewall actions (sinkhole/block/alert), and ATT&CK IDs. The
+firewall-side config those alerts depend on is documented in `README.md` §4
+(profile actions); update it too if you change which category a stage exercises.
+`Start-Demo.ps1`'s `Show-Expected` greps README table rows (`^\| \d `), so keep
+that table format.

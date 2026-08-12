@@ -1,4 +1,4 @@
-<#
+﻿<#
     Stage 4 - Lateral Movement
     ==========================
     Drives remote RPC operations against another internal host - the same
@@ -18,7 +18,7 @@
     Requires: admin rights on the LateralTarget and a reachable host.
 #>
 param([switch]$DryRun)
-. "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\..\..\config\lab-config.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
 
@@ -66,3 +66,4 @@ if ($cfg.DryRun) {
     }
 }
 Write-Stage "STAGE 4 done. Expect: 'Rare Scheduled Task RPC activity' + 'Rare Remote Service (SVCCTL) RPC activity'." "OK"
+

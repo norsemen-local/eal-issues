@@ -1,46 +1,45 @@
 <#
-    00-preflight.ps1  --  Verify the lab is ready before running the chain.
-    Checks: PowerShell version, admin rights, DNS resolution, DC reachability,
-    LDAP bind, and the required RPC ports to the lateral target.
+    00-preflight.ps1  --  Readiness checks for the firewall-block demo.
+    Confirms the host can reach the Palo Alto test resources THROUGH the NGFW.
+    No AD lab needed - this demo only requires DNS + HTTP egress via the firewall.
 #>
 . "$PSScriptRoot\..\config\lab-config.ps1"
 $cfg = $Global:EalDemo
-$ok = $true
 
-Write-Host "`n=== EAL Demo preflight ===`n" -ForegroundColor Magenta
-
-# PowerShell version
+Write-Host "`n=== Firewall demo preflight ===`n" -ForegroundColor Magenta
 Write-Stage "PowerShell version: $($PSVersionTable.PSVersion)" "INFO"
 
-# Admin rights (needed for stage 4)
-$isAdmin = ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent()
-    ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if ($isAdmin) { Write-Stage "Running elevated (admin) - stage 4 OK" "OK" }
-else          { Write-Stage "NOT elevated - stage 4 (lateral RPC) will likely fail" "WARN" }
-
-# Outbound DNS (stages 1 & 5)
+# 1) Basic outbound DNS
 try {
     Resolve-DnsName -Name "example.com" -Type A -QuickTimeout -ErrorAction Stop | Out-Null
-    Write-Stage "Outbound DNS resolution works (stages 1/5)" "OK"
-} catch { Write-Stage "Outbound DNS failed - stages 1/5 need DNS egress" "WARN"; $ok=$false }
+    Write-Stage "Outbound DNS resolution works" "OK"
+} catch { Write-Stage "Outbound DNS failed - the demo needs DNS egress through the firewall" "WARN" }
 
-# DC reachability (stages 2-4)
-if (Test-Connection -ComputerName $cfg.DomainController -Count 1 -Quiet -ErrorAction SilentlyContinue) {
-    Write-Stage "DC $($cfg.DomainController) reachable (ICMP)" "OK"
-} else { Write-Stage "DC $($cfg.DomainController) not answering ICMP (may still be OK if ICMP blocked)" "WARN" }
+# 2) DNS Security test domain - shows whether DNS Security is already acting
+$c2 = "test-c2.$($cfg.DnsTestDomain)"
+try {
+    $ans = Resolve-DnsName -Name $c2 -Type A -QuickTimeout -ErrorAction Stop
+    $ip  = ($ans | Where-Object IPAddress | Select-Object -First 1 -Expand IPAddress)
+    if ($ip -like "72.5.65.*" -or $ip -eq "0.0.0.0") {
+        Write-Stage "DNS Security ACTIVE - $c2 sinkholed to $ip (blocks will show)" "OK"
+    } else {
+        Write-Stage "$c2 resolved to $ip - DNS Security may be in 'alert' mode or not enforcing yet" "WARN"
+    }
+} catch {
+    Write-Stage "$c2 blocked/NXDOMAIN - DNS Security appears to be enforcing (good)" "OK"
+}
 
-# LDAP port 389 (stage 2/3)
-if (Test-NetConnection -ComputerName $cfg.DomainController -Port 389 -InformationLevel Quiet) {
-    Write-Stage "LDAP/389 open to DC (stages 2/3)" "OK"
-} else { Write-Stage "LDAP/389 NOT reachable - stages 2/3 will fail" "WARN"; $ok=$false }
-
-# RPC endpoint mapper 135 (stage 4)
-if (Test-NetConnection -ComputerName $cfg.LateralTarget -Port 135 -InformationLevel Quiet) {
-    Write-Stage "RPC/135 open to $($cfg.LateralTarget) (stage 4)" "OK"
-} else { Write-Stage "RPC/135 NOT reachable to lateral target - stage 4 will fail" "WARN" }
+# 3) HTTP egress to the URL Filtering test host
+try {
+    $r = Invoke-WebRequest -Uri "$($cfg.UrlFilterBase)/test-low-risk" -TimeoutSec $cfg.HttpTimeoutSec -UseBasicParsing -ErrorAction Stop
+    Write-Stage "HTTP egress to urlfiltering.paloaltonetworks.com works (HTTP $($r.StatusCode))" "OK"
+} catch {
+    Write-Stage "HTTP to the URL-filter test host was blocked/failed - URL Filtering may already enforce, or no egress" "WARN"
+}
 
 Write-Host ""
-if ($ok) { Write-Stage "Preflight looks good. You can run Run-All.ps1" "OK" }
-else     { Write-Stage "Some checks failed - DNS-only stages (1,5) still work standalone." "WARN" }
+Write-Stage "Reminder: on the NGFW, the security rule for this host must have" "INFO"
+Write-Stage "  Anti-Spyware (DNS Security), URL Filtering & Antivirus profiles" "INFO"
+Write-Stage "  attached, with log forwarding to Cortex XSIAM/XDR enabled." "INFO"
+Write-Stage "Use http:// (not https) for URL test pages unless decryption is on." "INFO"
 Write-Host ""
