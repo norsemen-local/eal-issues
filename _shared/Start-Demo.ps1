@@ -15,6 +15,8 @@ $cfg      = $Global:EalDemo
 $scripts  = Join-Path $PSScriptRoot 'scripts'
 $localCfg = Join-Path $PSScriptRoot 'config\lab-config.local.ps1'
 $fields   = @(); if ($cfg.ContainsKey('_ConfigFields')) { $fields = $cfg._ConfigFields }
+$stageNums = @($cfg._StageMap.Keys | Sort-Object)
+$stageLo   = $stageNums[0]; $stageHi = $stageNums[-1]
 
 function Pause-Return { Write-Host ""; Read-Host "Press Enter to return to the menu" | Out-Null }
 
@@ -82,11 +84,11 @@ do {
     switch ((Read-Host "Choose").Trim().ToUpper()) {
         '1' { Save-Config }
         '2' { & (Join-Path $scripts '00-preflight.ps1'); Pause-Return }
-        '3' { Invoke-Chain -Stages @(1,2,3,4,5) -DryRun }
-        '4' { Invoke-Chain -Stages @(1,2,3,4,5) -PauseBetween }
+        '3' { Invoke-Chain -Stages $stageNums -DryRun }
+        '4' { Invoke-Chain -Stages $stageNums -PauseBetween }
         '5' {
-                $s = Read-Host "Stage number (1-5)"
-                if ($s -match '^[1-5]$') { Invoke-Chain -Stages @([int]$s) -PauseBetween }
+                $s = Read-Host "Stage number ($stageLo-$stageHi)"
+                if (($s -match '^\d+$') -and ($stageNums -contains [int]$s)) { Invoke-Chain -Stages @([int]$s) -PauseBetween }
                 else { Write-Stage "Not a valid stage." "WARN"; Pause-Return }
              }
         '6' { Show-Expected }

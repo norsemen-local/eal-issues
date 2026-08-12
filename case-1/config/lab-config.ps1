@@ -1,56 +1,53 @@
 <#
-    lab-config.ps1  --  Central configuration for the EAL/Threat-Prevention Demo
-    ----------------------------------------------------------------------------
-    This demo is FIREWALL-CENTRIC: it drives the attack traffic through a Palo
-    Alto NGFW so the firewall itself DETECTS (alert) and BLOCKS (sinkhole/reset/
-    drop) it, producing firewall THREAT logs in Cortex XSIAM/XDR. Those logs are
-    100% firewall-sourced and are NOT shadowed by the XDR agent - so it does not
-    matter that every host is onboarded to the agent.
+    Case 1 - Drive-by to Data Theft (Malware C2 & Exfil) : configuration
+    --------------------------------------------------------------------
+    Full attack flow: the attacker breaches a public-facing web app (INITIAL
+    ACCESS), then the implant beacons over DGA domains + DNS tunneling, makes
+    suspicious/failed DNS lookups, and exfiltrates to a rarely-seen domain.
 
-    All traffic uses Palo Alto Networks' OFFICIAL, 100% benign test resources:
-      - DNS Security test domains .......... *.testpanw.com
-      - URL Filtering test pages ........... urlfiltering.paloaltonetworks.com
-    No malware, no exploitation, no real C2. Edit values below if needed.
+    Every stage maps to an ENABLED EAL analytics rule:
+      1 Initial Access ..... Suspicious failed HTTP request - Spring4Shell (1028c23d)
+      2 C2 (DGA) ........... Random-Looking Domain Names                    (ce6ae037)
+      3 C2 (tunnel) ........ DNS Tunneling                                  (61a5263c)
+      4 C2 (odd DNS) ....... Suspicious DNS traffic (2a77fad6) + Failed DNS (74c65024)
+      5 Exfiltration ....... Abnormal Communication to a Rare Domain        (c2da63d1)
 
-    Start-Demo.ps1 'Auto-detect' / 'Configure' persists overrides to
-    lab-config.local.ps1 (loaded last). Scripts read everything from $cfg.
+    Stages 2-4 also query PANW DNS-Security TEST domains (*.testpanw.com) so the
+    firewall additionally sinkholes/BLOCKS them - the detect-AND-block layer.
 #>
 
 $Global:EalDemo = @{
+    AttackerHostname = $env:COMPUTERNAME
 
-    # ----- Attacker identity ----------------------------------------------
-    AttackerHostname  = $env:COMPUTERNAME
+    # Initial access: a lab web server reachable THROUGH the firewall (http://).
+    TargetWebServer  = "http://192.0.2.80"
 
-    # ----- URL Filtering test pages (Stage 1,2,4) -------------------------
-    # MUST be http:// (not https) unless SSL decryption is enabled, otherwise
-    # the firewall cannot read the URL path and won't categorize the test page.
-    UrlFilterBase     = "http://urlfiltering.paloaltonetworks.com"
+    # C2 / exfil analytics
+    DgaRootDomain    = "demo-c2-lab.net"     # DGA parent (random subdomains under it)
+    DgaLookupCount   = 45
+    TunnelDomain     = "tunnel.demo-c2-lab.net"
+    TunnelKilobytes  = 15
+    RareDomain       = "rare-exfil-demo.net" # rarely-seen exfil destination
 
-    # ----- DNS Security test domains (all stages) -------------------------
-    # Resolving these makes the firewall's DNS Security categorize the query
-    # and apply the Anti-Spyware DNS policy action (alert / sinkhole / block).
-    DnsTestDomain     = "testpanw.com"
+    # PANW DNS-Security test domains for the firewall block layer
+    DnsTestDomain    = "testpanw.com"
 
-    # ----- Optional: EICAR AV test (Stage 1) ------------------------------
-    # Downloads the industry-standard EICAR test string so Antivirus/WildFire
-    # blocks it. Requires SSL decryption if the source is https. Off by default.
-    EnableEicar       = $false
-    EicarUrl          = "http://www.eicar.org/download/eicar.com.txt"
+    DelayBetweenReqMs= 300
+    DryRun           = $false
 
-    # ----- Behaviour ------------------------------------------------------
-    HttpTimeoutSec    = 15
-    DnsQueriesPerName = 3            # repeat each test lookup a few times
-    DelayBetweenReqMs = 400          # pacing between requests
-    DryRun            = $false        # $true = print actions, send NO traffic
-
-    # ----- Optional AD/EAL behavioural add-on (advanced) ------------------
-    # The original behavioural-analytics stages (LDAP/Kerberos/RPC) still exist
-    # but are OPTIONAL now - with an agent on every host they get attributed to
-    # the endpoint. Left here for a full AD lab; not needed for the FW demo.
-    Domain            = "corp.local"
-    DomainController  = "DC01.corp.local"
-    LateralTarget     = "FS01.corp.local"
-    LabUser           = "corp\\analyst"
+    _Title = "PANW EAL Demo - Case 1 : Drive-by to Data Theft (Malware C2 & Exfil)"
+    _ConfigFields = @(
+        @{ Key='TargetWebServer'; Prompt='Initial-access web server (http://host)' }
+        @{ Key='DgaRootDomain';   Prompt='DGA parent domain' }
+        @{ Key='RareDomain';      Prompt='Rare exfil domain' }
+    )
+    _StageMap = @{
+        1 = @{ File="01-initial-access-web.ps1"; Title="Initial Access - web exploit (Spring4Shell)" }
+        2 = @{ File="02-dga-domains.ps1";        Title="C2 - DGA / random-looking domains" }
+        3 = @{ File="03-dns-tunneling.ps1";      Title="C2 - DNS tunneling" }
+        4 = @{ File="04-suspicious-dns.ps1";     Title="C2 - suspicious / failed DNS" }
+        5 = @{ File="05-exfil-rare-domain.ps1";  Title="Exfiltration - rare-domain comms" }
+    }
 }
 
 function Write-Stage {
@@ -60,8 +57,7 @@ function Write-Stage {
     Write-Host "[$ts][$Level] $Msg" -ForegroundColor $color
 }
 
-# ----- Local overrides -----------------------------------------------------
 $__local = Join-Path $PSScriptRoot 'lab-config.local.ps1'
 if (Test-Path $__local) { . $__local }
 
-Write-Stage "Loaded firewall-demo config (attacker=$($Global:EalDemo.AttackerHostname))" "OK"
+Write-Stage "Loaded Case-1 config (web IA=$($Global:EalDemo.TargetWebServer))" "OK"

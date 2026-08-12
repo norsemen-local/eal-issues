@@ -13,6 +13,8 @@ param([int[]]$Stages = @(1,2,3,4,5), [switch]$DryRun, [switch]$PauseBetween)
 . "$PSScriptRoot\..\config\lab-config.ps1"
 $cfg = $Global:EalDemo
 $map = $cfg._StageMap        # plain hashtable keyed by int stage number
+# Default to every stage in the map (handles 5- and 6-stage cases alike).
+if (-not $PSBoundParameters.ContainsKey('Stages')) { $Stages = @($map.Keys | Sort-Object) }
 
 Write-Host "`n============================================================" -ForegroundColor Magenta
 Write-Host "  $($cfg._Title)" -ForegroundColor Magenta

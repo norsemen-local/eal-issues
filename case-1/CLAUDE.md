@@ -4,25 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A **detection-engineering / SE demo**, not a shipping application. It drives a
-5-stage MITRE ATT&CK attack chain (initial access → C2 → DGA/DNS-tunneling →
-malware/ransomware staging → exfiltration) from a single Windows host so that a
-**Palo Alto Networks NGFW itself detects and BLOCKS** the traffic (DNS Security
-sinkhole, URL Filtering block, Antivirus reset) and Cortex XSIAM/XDR shows the
-resulting **firewall threat/URL logs**.
+Case 1 of a 5-case Palo Alto **EAL-log detection demo** (see `../README-cases.md`).
+Theme: **Drive-by to Data Theft** — a full malware intrusion. Stage→enabled-rule
+chain (source of truth = `README.md` §1):
+1. **Initial Access** — Spring4Shell web exploit (`1028c23d`)
+2. C2 — Random-Looking Domain Names / DGA flood (`ce6ae037`)
+3. C2 — DNS Tunneling >10 KB (`61a5263c`)
+4. C2 — Suspicious DNS traffic (`2a77fad6`) + Failed DNS (`74c65024`)
+5. Exfil — Abnormal Communication to a Rare Domain (`c2da63d1`)
 
-**Key design decision (do not regress):** the demo is *firewall-enforcement*
-centric, not *behavioural-analytics* centric. Firewall Threat-Prevention logs are
-unambiguously firewall-sourced and are **not shadowed by the Cortex XDR agent**,
-so the demo works even when every lab host runs the agent. See `README.md` §8.
-All traffic uses Palo Alto's **official benign test resources** — the
-`*.testpanw.com` DNS Security test domains and the
-`urlfiltering.paloaltonetworks.com` URL Filtering test pages — never real
-malware/C2. The exact FQDNs/categories are the source of truth in `README.md` §1.
+Every stage maps to an **enabled** analytics rule, and stage 1 is a reliable,
+pattern-based Initial Access (don't replace it with a behavioural detector).
+Stages 2/3/5 also query PANW DNS-Security test domains (`*.testpanw.com`) so the
+firewall additionally **sinkholes/blocks** — the detect-AND-block bonus layer.
+Generators live in `scripts/_traffic.ps1` (DGA, tunnel, suspicious/rare DNS,
+test-domain blocks); the web IA uses the shared `scripts/_ia.ps1`.
 
-The earlier AD behavioural-analytics stages (EAL "Rare LDAP enumeration",
-Kerberoast, RPC) live under `scripts/optional-ad-eal/` as an optional add-on;
-they get attributed to the endpoint agent and are **not** the primary demo.
+The older AD behavioural stages live under `scripts/optional-ad-eal/` (optional;
+agent-shadowed — not part of the main chain).
 
 ## Running
 
