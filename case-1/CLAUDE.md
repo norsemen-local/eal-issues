@@ -20,9 +20,14 @@ stage→tactic→alert table in `README.md` §1, derived from the Cortex docs at
 
 The intended entry point is **`Start-Demo.cmd`** (double-click / run as admin):
 it self-elevates, sets the execution policy, and opens `Start-Demo.ps1`, a menu
-that wraps configure / preflight / dry-run / run. The menu's "Configure" writes
-`config/lab-config.local.ps1` (git-ignore-worthy per-machine overrides that
-`lab-config.ps1` dot-sources last), so users never hand-edit config. Underneath,
+that wraps auto-detect / configure / preflight / dry-run / run. On first launch
+(no local config yet) it offers **auto-detect** (`Invoke-AutoDetect`), which reads
+domain / DC+IP / current user / a non-DC member server (RPC/135) straight off the
+machine and can't know only the external C2/exfil endpoints. Both auto-detect and
+manual "Configure" persist via `Write-LocalConfig` to `config/lab-config.local.ps1`
+(per-machine overrides that `lab-config.ps1` dot-sources last), so users never
+hand-edit config. `$script:PersistKeys` is the single list of saved fields — add
+to it when a new configurable value should survive across runs. Underneath,
 everything is still the scripts below — keep them runnable standalone:
 
 ```powershell

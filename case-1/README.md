@@ -112,20 +112,34 @@ case-1/
 
 ## 4. Configure
 
-Open `config\lab-config.ps1` and set at least:
+**You normally don't configure anything by hand.** Launch `Start-Demo.cmd` and,
+on first run, it offers to **auto-detect** from the machine it's running on. On a
+domain-joined host it fills in:
+
+| Setting | Auto-detected from |
+|---------|--------------------|
+| `LabUser` | current logged-on user (`$USERDOMAIN\$USERNAME`) |
+| `Domain` | machine's AD domain (`$USERDNSDOMAIN` / current-domain lookup) |
+| `DomainController` + `DCIpAddress` | nearest DC via `FindDomainController()`, IP resolved |
+| `LateralTarget` + `LateralTargetIp` | first non-DC member server that answers on RPC/135 |
+
+The results are saved to `config\lab-config.local.ps1` (which `lab-config.ps1`
+loads last, overriding defaults). Re-run auto-detect any time via menu **[A]**.
+
+**What auto-detect can't know** (external to your network) — set these via menu
+**[1]** only if you control them; otherwise the defaults still generate
+firewall-loggable traffic:
 
 ```powershell
-Domain           = "corp.local"
-DomainController = "DC01.corp.local"
-DCIpAddress      = "10.0.0.10"
-LateralTarget    = "FS01.corp.local"
-LateralTargetIp  = "10.0.0.20"
-LabUser          = "corp\analyst"      # low-priv lab account
-DgaRootDomain    = "demo-c2-lab.net"   # a domain you control, ideally
-ExfilUrl         = "https://rare-storage-demo.example-upload.net/upload"
+DgaRootDomain = "demo-c2-lab.net"    # C2 / DGA parent domain you own
+ExfilUrl      = "https://rare-storage-demo.example-upload.net/upload"
 ```
 
-Everything else (payload sizes, request pacing, `DryRun`) has a working default.
+> Two things auto-detect proposes but you should **confirm**: that you actually
+> have **admin rights** on the chosen `LateralTarget` (needed for stage 4), and
+> that the picked server is an acceptable demo target. Change it with **[1]** if
+> not. Everything else (payload sizes, pacing, `DryRun`) has a working default in
+> `config\lab-config.ps1`.
 
 ---
 
