@@ -85,7 +85,7 @@ observes. 🟠 **SIMULATED**: approximation only.
 | 2 | Uncommon SSH | Real TCP connect to attacker :2201–2203, reads the server banner, writes `SSH-2.0-CovertOps_0.9` — **raw socket from powershell.exe, no key exchange / not real SSH** | Uncommon SSH session `18f84dd7` | 🟡 **REAL·baseline** (App-ID may class it `ssh` by banner) | FW (EAL) |
 | 3 | SSH tunnel volume | **Real bytes on the wire**: writes 256 KB + 384 KB random data over the TCP stream + holds it **+** `test-dnstun`.testpanw.com | Unusual SSH Activity `f1545c54` (+ ✅ DNS-Sec) | 🟡 **REAL·baseline** (volume real; not an encrypted SSH tunnel) (+ ✅ anchor) | FW (EAL / DNS-Sec) |
 | 4a | File-assoc hijack (endpoint) | **Real** HKCU `.eal` + `ealfile\shell\open\command` → `powershell … IEX`, then reverted | Manipulation of default file association | 🔵 **REAL·endpoint** | XDR agent (BIOC) |
-| 4b | Rare ad domains | DNS + `GET px?cid=…` to 4 **invented** `.net` domains → NXDOMAIN **+** `test-adtracking`.testpanw.com | Rare access to advertising domains | 🟠 **SIMULATED** (fake domains aren't in PANW's ad category) · only the ✅ anchor fires | FW (EAL / DNS-Sec) |
+| 4b | Rare ad domains | DNS + `GET px?cid=…` to 8 **real known** ad/tracking domains (doubleclick, googlesyndication, scorecardresearch, adnxs, adsrvr, taboola, criteo, moatads) **+** `test-adtracking`.testpanw.com | Rare access to known advertising domains | 🟡 **REAL·baseline** (real ad-category hits; rarity is baseline) (+ ✅ anchor) | FW (EAL / DNS-Sec) |
 | 5 | Remote scheduled task | **Real** `schtasks /create /run /delete /s <target>` (ATSVC MSRPC) — errors swallowed; lands only if target reachable + admin | Rare Scheduled Task RPC from a rarely-seen host (T1053) | 🟡 **REAL·baseline** — **agent-shadowed on the target** | FW (EAL) + XDR agent on target |
 
 **Bottom line:** the instant, reliable hits are stage 1 (phishing) and the
@@ -93,10 +93,11 @@ observes. 🟠 **SIMULATED**: approximation only.
 file-association BIOC on the agent. The SSH stages push **real byte volume** over a
 real socket, but it is a **raw powershell.exe banner exchange, not encrypted SSH** —
 App-ID must hold `ssh` and the 30-day baseline must mature for `18f84dd7`/`f1545c54`
-to fire, and only if the attacker's port is actually listening. **Stage 4b's ad
-beaconing is simulated** — the four `.net` names are invented and not in PANW's
-advertising category, so its named detector won't fire; only the co-located
-`test-adtracking` anchor produces a real detection. Stage 5 **does really create**
+to fire, and only if the attacker's port is actually listening. **Stage 4b now uses
+real known advertising domains** (doubleclick, googlesyndication, …) so the ad
+category genuinely matches and "Rare access to known advertising domains" has real
+known-ad-domain hits to key on (rarity is baseline); the `test-adtracking` anchor
+still gives the instant firewall detection. Stage 5 **does really create**
 the remote task via the `schtasks.exe` LOLBIN (an agent on the target out-races the
 firewall analytic — genuine agent-shadowing), but on an unreachable host or without
 admin it emits only an RPC attempt. Note: README's "Uncommon SSH session" *agent*

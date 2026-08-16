@@ -22,7 +22,13 @@ $Global:EalDemo = @{
     AttackerHostname = $env:COMPUTERNAME
     AttackerC2       = "170.187.158.212"      # exfil FTP server + upload endpoint
     FtpUser          = "leaver_x"             # deliberately unusual FTP user
-    StorageDomain    = "personal-cloud-drop.net"  # rare storage/mail exfil domain
+    # REAL online-storage domain (categorises as online-storage/file-sharing) so the
+    # exfil destination genuinely matches the 'rare storage/mail' category. By default
+    # the bulk volume goes to your lab drop (AttackerC2) and this domain only gets a
+    # small categorisation touch. To fire the exact VOLUME-based detector, point this
+    # at a real online-storage host YOU control and set UploadVolumeToStorage=$true.
+    StorageDomain    = "mega.nz"
+    UploadVolumeToStorage = $false
     ExfilMegabytes   = 45
 
     HttpTimeoutSec   = 30

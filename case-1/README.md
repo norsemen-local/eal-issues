@@ -91,9 +91,9 @@ tool. (See the root [`../README.md`](../README.md) for the full legend.)
 `test-*.testpanw.com` sinkholes fire on the first run. Stages 2–5 send **genuine**
 DGA/tunnel/rare-domain DNS — real traffic the analytics model — but those named
 rules only fire once the baseline matures or is seeded. **Nothing here is a real
-malware infection**; the "payload" fetch is a plain HTTP GET. Note a doc/label
-drift: `CLAUDE.md`/`lab-config.ps1` call stage 1 "Spring4Shell `1028c23d`", but the
-running code does **URL-Filtering phishing**, not Spring4Shell.
+malware infection**; the "payload" fetch is a plain HTTP GET. (Stage 1 is
+phishing/URL-Filtering — via `_ia-phishing.ps1` — not Spring4Shell; the config,
+`CLAUDE.md`, and checklist all reflect this.)
 
 ---
 

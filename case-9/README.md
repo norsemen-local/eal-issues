@@ -90,20 +90,33 @@ can't be produced natively at all.
 | 2e | Cert-store access (endpoint) | **Real** enumerate + `.Export()` of `Cert:\CurrentUser\My` and SystemCertificates files | Suspicious process accessed certificate files (T1552.004) | 🔵 **REAL·endpoint** | XDR agent (BIOC) |
 | 2 | Long-user + rare NTLM | **Real** `net use \\IP\IPC$ /user:"<80+ char special name>"` + NTLM-by-IP **+** `test-c2`.testpanw.com | Long-Username Login (T1190) + Rare NTLM (T1550) (+ ✅ DNS-Sec) | 🟡 **REAL·baseline** (+ ✅ anchor) | FW (EAL/ITDR) |
 | 3 | Machine-account NTLM | `net use \\IP\IPC$` as current user — **only a `$` machine account if launched via `PsExec -s`** **+** `test-malware`.testpanw.com | Machine-account NTLM (T1187) (+ ✅ DNS-Sec) | 🟡 **REAL·baseline** (needs SYSTEM ctx) (+ ✅ anchor) | FW (EAL/ITDR) |
-| 4 | Weak RC4 Kerberos TGT | Real `KerberosRequestorSecurityToken` TGS requests for 5 SPNs — **etype is NOT forced to RC4** **+** `test-c2`.testpanw.com | Weakly-Encrypted Kerberos TGT (T1556.001) (+ ✅ DNS-Sec) | 🟠 **SIMULATED** (RC4 not guaranteed on AES-default AD) (+ ✅ anchor) | FW (EAL/ITDR) |
-| 5 | ADFS sync / Golden SAML | Real `GET /adfs/services/policystoretransfer` + `FederationMetadata.xml`, port probes — **recon connections only; no token-signing-key theft, no SAML forgery** **+** `test-dns-infiltration` / `test-c2`.testpanw.com | Unusual ADFS Remote Sync (T1606.002) (+ ✅ DNS-Sec) | 🟠 **SIMULATED** for the forgery / 🟡 for the recon connections (+ ✅ anchor) | FW (EAL/ITDR) |
+| 4 | Weak RC4 Kerberos TGT | Real `KerberosRequestorSecurityToken` TGS requests for 5 SPNs — etype not forced by default; with `-EnableRealExploits` + `Rubeus.exe` (`asktgt /rc4`) + operator creds it forces the RC4 etype **+** `test-c2`.testpanw.com | Weakly-Encrypted Kerberos TGT (T1556.001) (+ ✅ DNS-Sec) | 🟠→✅ **SIMULATED by default** (etype not forced); **REAL RC4** when `-EnableRealExploits` + Rubeus + operator creds (+ ✅ anchor) | FW (EAL/ITDR) |
+| 5 | ADFS sync / Golden SAML | Real `GET /adfs/services/policystoretransfer` + `FederationMetadata.xml`, port probes (recon) by default; with `-EnableRealExploits` + AADInternals/`ADFSDump.exe` on the lab ADFS it performs a **real token-signing-key export** (SAML forgery remains the operator's next step) **+** `test-dns-infiltration` / `test-c2`.testpanw.com | Unusual ADFS Remote Sync (T1606.002) (+ ✅ DNS-Sec) | 🟠→✅ **recon by default**; **REAL signing-key export** when `-EnableRealExploits` + AADInternals/ADFSDump on the lab ADFS (+ ✅ anchor) | FW (EAL/ITDR) |
 
 **Bottom line:** on a fresh tenant the only guaranteed alerts are stage 1's
 phishing hit, the per-stage `test-*.testpanw.com` DNS-Security sinkholes, and (with
 an agent) the stage-2 cert-store BIOC. Everything named-identity (stages 2–5)
 requires **ITDR/Identity Analytics enabled, a real AD/ADFS lab answering the
 traffic, and a matured baseline** — the placeholder targets (`10.0.0.20`,
-`DC01.corp.local`, `adfs.corp.local`) won't authenticate in a bare demo. **Two
-signals are simulated:** the **RC4 downgrade** (etype not forced — the exact
-weak-TGT rule may not fire against modern AES-default AD without RC4-only SPNs or
-Rubeus) and the **Golden SAML forgery** (never performed — it requires stealing the
-ADFS token-signing key, which no code attempts). Stage 3's machine-account (`$`)
-signal only appears when run as **SYSTEM** (`PsExec -s`).
+`DC01.corp.local`, `adfs.corp.local`) won't authenticate in a bare demo. Stage
+3's machine-account (`$`) signal only appears when run as **SYSTEM** (`PsExec -s`).
+
+**Opt-in real exploits (stages 4 & 5).** By default stages 4 and 5 are
+traffic-only (the two signals above are *simulated*: RC4 etype is not forced, and
+no token-signing key is ever touched). To fire the **exact** detectors you must
+pass **`-EnableRealExploits`** AND supply the operator's own audited tool — this
+demo never downloads or bundles a tool, and never implements the exploit itself
+(see [`scripts/_exploit.ps1`](scripts/_exploit.ps1)). Both conditions off ⇒
+current behaviour is unchanged. When enabled these perform **real identity
+operations against your lab AD/ADFS**:
+- **Stage 4 — RC4 downgrade:** drop **`Rubeus.exe`** in `scripts\tools\` and edit
+  the `<user>`/`<rc4hash>` placeholders in `04-kerberos-rc4.ps1` (operator secrets
+  — never hardcoded). Rubeus `asktgt /rc4` forces the weak etype the
+  *Weakly-Encrypted Kerberos TGT Response* rule keys on.
+- **Stage 5 — Golden SAML prerequisite:** install the **AADInternals** module (or
+  drop **`ADFSDump.exe`** in `scripts\tools\`) and run on the lab **ADFS server**
+  (requires local access). It performs a **real ADFS token-signing-key export**;
+  forging the SAML token remains the operator's next step and is not done here.
 
 ---
 

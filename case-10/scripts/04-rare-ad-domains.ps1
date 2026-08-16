@@ -1,11 +1,14 @@
 <#
     Stage 4 (MIDDLE) - Adware-like beaconing to rare advertising domains
     ====================================================================
-    The host makes many connections to unpopular advertising domains - the
-    pattern of adware / a browser-extension implant used for stealth C2.
+    The host makes many connections to REAL known advertising/tracking domains
+    (doubleclick, googlesyndication, scorecardresearch, ...) - the pattern of
+    adware / a browser-extension implant used for stealth C2. Using genuine ad
+    domains (not made-up names) means the firewall's ad category matches for real
+    and the detector has real KNOWN-advertising-domain hits to key on.
 
       EAL alert : 'Rare access to known advertising domains'  (T1071 / T1176.001)
-      NOTE: enable this detector in Cortex if off.
+      NOTE: rarity is baseline-scored - enable this detector in Cortex if off.
 #>
 param([switch]$DryRun)
 . "$PSScriptRoot\..\config\lab-config.ps1"

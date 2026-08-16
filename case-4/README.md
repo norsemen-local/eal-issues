@@ -84,19 +84,32 @@ say so and point to the helper tool.
 | 1 | Phishing / drive-by IA | Real GETs to PANW URL-Filtering test pages + attacker-IP fetch | Phishing/malware URL categorisation | ✅ **REAL·instant** | FW (URL Filtering) |
 | 2 | LDAP enumeration | Real `DirectorySearcher` queries (Domain Admins, SPN/Kerberoast, AS-REP, unconstrained deleg, trusts) to the DC | Rare LDAP enumeration `fcb12ef3` | 🟡 **REAL·baseline** (needs ITDR) | FW (EAL) |
 | 3 | WPAD (AITM) | Real `Resolve-DnsName` + `GET http://wpad/wpad.dat` ×3 names ×4 | Uncommon WPAD queries `f1546fee` | 🟡 **REAL·baseline** | FW (EAL) |
-| 4 | EFSRPC / PetitPotam | `net use \\DC\IPC$`, opens `\pipe\efsrpc` / `\pipe\lsarpc` — **SMB pipe connect only, no `EfsRpcOpenFileRaw` coercion** | Suspicious EFSRPC to DC `82a37634` | 🟠 **SIMULATED** — needs PetitPotam.exe / Impacket | FW (EAL) |
-| 5 | DCSync from non-DC | Port-135 probe + touches `\pipe\lsarpc`/`samr`/`netlogon` — **no DRSUAPI `GetNCChanges`, never even binds the drsuapi pipe** | Possible DCSync from non-DC `b00baad9` | 🟠 **SIMULATED** — needs mimikatz / Impacket secretsdump | FW (EAL) |
-| 6 | Bronze Bit | Requests ordinary Kerberos service tickets for HOST/CIFS/LDAP SPNs — **no S4U2self/S4U2proxy, no forged forwardable flag (CVE-2020-17049)** | Bronze-Bit exploit `115c6f43` | 🟠 **SIMULATED** — needs Rubeus / Impacket getST | FW (EAL) |
+| 4 | EFSRPC / PetitPotam | `net use \\DC\IPC$`, opens `\pipe\efsrpc` / `\pipe\lsarpc` (traffic); with the flag + tool, runs the operator's `PetitPotam.exe`/`Coercer.exe` for the real `EfsRpcOpenFileRaw` coercion | Suspicious EFSRPC to DC `82a37634` | 🟠→✅ **SIMULATED by default; REAL when `-EnableRealExploits` + tool present** | FW (EAL) |
+| 5 | DCSync from non-DC | Port-135 probe + touches `\pipe\lsarpc`/`samr`/`netlogon` (traffic); with the flag + tool, runs the operator's `mimikatz.exe`/`secretsdump.exe` for the real DRSUAPI `GetNCChanges` | Possible DCSync from non-DC `b00baad9` | 🟠→✅ **SIMULATED by default; REAL when `-EnableRealExploits` + tool present** | FW (EAL) |
+| 6 | Bronze Bit | Requests ordinary Kerberos service tickets for HOST/CIFS/LDAP SPNs (traffic); with the flag + tool, runs the operator's `Rubeus.exe`/`getST.exe` for the real S4U + forged-forwardable flag (CVE-2020-17049) | Bronze-Bit exploit `115c6f43` | 🟠→✅ **SIMULATED by default; REAL when `-EnableRealExploits` + tool present** | FW (EAL) |
 
 **Bottom line:** on a fresh tenant only stage 1 fires first-run. Stages 2–3 are
 **real** LDAP/WPAD traffic that alerts once the baseline matures with ITDR enabled
-against a real AD lab. **Stages 4, 5 and 6 will not trigger their named detectors
-as shipped** — they generate look-alike SMB/RPC/Kerberos traffic but not the actual
-coercion/replication/ticket-forgery. Drop `PetitPotam.exe` / `mimikatz.exe` /
-`Rubeus.exe` in `scripts\tools\` for the genuine article (the scripts detect their
-presence but never auto-run them). Doc drift: README §1/`CLAUDE.md` label stage 1
-"FTP brute `91db0f65`", but the running code does **phishing URL-Filtering** —
-treat stage 1 as phishing.
+against a real AD lab. **Stages 4, 5 and 6 are traffic-only by default** — they
+generate look-alike SMB/RPC/Kerberos traffic but not the actual
+coercion/replication/ticket-forgery, so their named detectors will not fire as
+shipped. To fire the exact detector, run with **`-EnableRealExploits`** *and* place
+the matching operator-supplied tool in **`scripts\tools\`**:
+
+- EFSRPC → `PetitPotam.exe` / `petitpotam.exe` / `Coercer.exe`
+- DCSync → `mimikatz.exe` / Impacket `secretsdump.exe`
+- Bronze Bit → `Rubeus.exe` / Impacket `getST.exe`
+
+Both conditions are required: without the flag, or with no tool in `scripts\tools\`,
+the stages stay traffic-only (`-DryRun` still executes nothing). The lab never
+downloads or bundles a tool and never implements the exploit itself — it only
+shells out to a binary the authorized operator placed in `tools\`. **These perform
+real credential operations against the lab DC** (DCSync pulls the `krbtgt` hash;
+Bronze Bit forges a service ticket). The **DCSync (`secretsdump`)** and **Bronze
+Bit (`getST`)** Impacket paths need **operator-supplied credentials/hashes** — the
+tool prompts for them; nothing is hardcoded here. (Stage 1 is phishing/URL-Filtering
+— via `_ia-phishing.ps1` — not FTP brute; the config, `CLAUDE.md`, and checklist
+all reflect this.)
 
 ---
 

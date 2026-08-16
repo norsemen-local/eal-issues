@@ -6,7 +6,7 @@ near real-time.
 
 | ✓ | Stage | Alert (rule id) | Confirm |
 |---|-------|-----------------|---------|
-| ☐ | 1 (IA) | Suspicious failed HTTP request - Spring4Shell (`1028c23d`) | `class.module.classLoader` request to web server |
+| ☐ | 1 (IA) | Phishing site access + malware URL (URL Filtering) | victim → phishing/malware test URL + attacker host |
 | ☐ | 2 | Random-Looking Domain Names (`ce6ae037`) | many random root domains from the host |
 | ☐ | 3 | DNS Tunneling (`61a5263c`) | >10 KB under `tunnel.<DgaRootDomain>` |
 | ☐ | 4 | Suspicious DNS traffic (`2a77fad6`) + Failed DNS (`74c65024`) | malformed / NXDOMAIN lookups |

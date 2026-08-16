@@ -21,7 +21,10 @@ $Global:EalDemo = @{
     AttackerC2       = "170.187.158.212"     # Kali attacker / C2 (phishing + SSH tunnel endpoint)
     SshPort          = 2201                    # non-standard SSH port on the attacker
     LateralTarget    = "10.0.0.20"            # remote host for the scheduled-task persistence
-    AdDomains        = "adserv-track-77.net,micro-ads-cdn.net,rare-adnet-xyz.net,clickpixel-obscure.net"
+    # REAL, well-known advertising/tracking domains (categorised as web-advertisements
+    # / ad-tracking by PAN URL & DNS Security) so 'Rare access to known advertising
+    # domains' has genuine KNOWN-ad-domain hits to key on. Rarity is per-host baseline.
+    AdDomains        = "doubleclick.net,googlesyndication.com,scorecardresearch.com,adnxs.com,adsrvr.org,taboola.com,criteo.com,moatads.com"
 
     HttpTimeoutSec   = 8
     DelayBetweenReqMs= 300

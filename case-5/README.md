@@ -79,20 +79,21 @@ property or a raw-socket tool the script can't produce.
 |---|-------|------------------------------|-----------|-------|--------|
 | 1 | Phishing / drive-by IA | Real GETs to PANW URL-Filtering test pages + attacker-IP fetch | Phishing/malware URL categorisation | ✅ **REAL·instant** | FW (URL Filtering) |
 | 2 | FTP anon + brute | Real `FtpWebRequest` logins: anonymous, ftp/ftp, then 8 brute users | FTP Anon/Default `68d806a3` + Multiple FTP Login Attempts `91db0f65` | 🟡 **REAL·baseline** (these two are enabled) | FW (EAL) |
-| 3 | SSH uncommon / same host key | Raw `TcpClient` reads the ~256-byte version banner then closes — **no KEXINIT, no host-key exchange**; local config = one IP on 3 ports | Multiple uncommon SSH servers, same host key `f154d651` | 🟠 **SIMULATED** — "same key" is a **target-server property**; the wire never carries a host key | FW (EAL) |
+| 3 | SSH uncommon / same host key | **Real SSH key exchange via the built-in `ssh.exe`** to each server:port — KEX presents the server host key on the wire, then disconnects before auth (no creds used). Falls back to banner-read if `ssh.exe` is absent | Multiple uncommon SSH servers, same host key `f154d651` | 🟡 **REAL·baseline** — needs the lab SSH servers to actually **share one host key** | FW (EAL) |
 | 4 | SSH downgrade | Raw TCP connect that genuinely **writes** a legacy `SSH-1.5-…` / `SSH-1.99-…` client version string (the exact banner the analytic keys on) — but no cipher/KEX negotiation | Suspicious SSH Downgrade `f154f3c5` | 🟡 **REAL·baseline** (legacy banner is real) | FW (EAL) |
-| 5 | ICMP covert channel | `Ping` sends oversized/random-payload echoes (1024–1472 B — better than plain pings), a "sweep" (but all targets = one IP), and a `.255` broadcast (OS usually drops) | Suspicious ICMP `f3389ebd` (+ multi-host `09f9a9a7`, smurf `72694178`) | 🟠 **SIMULATED** — `f3389ebd` wants an ICMP **router-advertisement** (needs a raw socket); multi-host needs **distinct IPs** | FW (EAL) |
+| 5 | ICMP covert channel | `Ping` sends oversized/random-payload echoes (1024–1472 B — real, not plain pings), a "sweep", and a `.255` broadcast (OS usually drops) | Suspicious ICMP `f3389ebd` (+ multi-host `09f9a9a7`, smurf `72694178`) | 🟡 real oversized-ICMP / 🟠 **SIMULATED** for the exact router-advert (needs a raw-socket tool) + multi-host (needs **distinct IPs**) | FW (EAL) |
 | 6 | SMB exfil | Writes a real 20 MB random file, `Copy-Item` to `\\host\share` — genuine SMB session + large write over 445 | Rare file transfer over SMB `045e06dd` | 🟡 **REAL·baseline** | FW (EAL) |
 
 **Bottom line:** stages 1 and 2 are the reliable signals (phishing instant; FTP
-anon/brute rules are enabled). Stages 4 and 6 send **genuine** legacy-SSH-banner /
-large-SMB traffic that alerts once baselined. **Stages 3 and 5 will not fire their
-named detectors from this code alone** — stage 3's "same host key" depends on the
-lab's SSH servers all sharing one key (the setup script socats 3 ports → one :22
-key), and stage 5's exact ICMP router-advertisement needs a raw-socket crafting
-tool plus several distinct target IPs. `lab-config.local.ps1` collapses everything
-to a single IP, which further blocks the "multiple servers/hosts" conditions. This
-case is entirely firewall-sourced (no XDR-agent BIOC content).
+anon/brute rules are enabled). Stages 3, 4 and 6 now send **genuine** SSH
+key-exchange / legacy-SSH-banner / large-SMB traffic that alerts once baselined —
+stage 3 completes a real handshake so the host key is actually on the wire, but the
+"same key" match still requires the **lab SSH servers to share one host key** (the
+setup script socats 3 ports → one :22 key). **Stage 5 remains partly simulated** —
+the oversized ICMP echoes are real, but the exact router-advertisement variant needs
+a raw-socket crafting tool and the multi-host variant needs several distinct target
+IPs (`lab-config.local.ps1` collapses everything to one IP). This case is entirely
+firewall-sourced (no XDR-agent BIOC content).
 
 ---
 

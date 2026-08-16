@@ -83,18 +83,21 @@ subtlety is destination *categorisation* and which detectors are enabled.
 | 1 | Job-hunt + time-consuming browsing | Real HTTPS GETs to 6 live job boards (LinkedIn/Indeed/Glassdoor/Monster/ZipRecruiter/Dice) + 6 streaming/social sites — genuinely categorisable via SNI | Increase in Job-Related Site Visits + multiple time-consuming sites (T1593) | 🟡 **REAL·baseline** (*enable if off*) | FW (EAL) |
 | 2e | Data staging (endpoint) | **Real** random `.bin` files `Compress-Archive`'d into a ~5 MB zip in %TEMP% (label says 25 MB; code writes ~5) | Suspicious file created / data staging (T1560) | 🔵 **REAL·endpoint** | XDR agent (BIOC) |
 | 2 | New / rare FTP channel | **Real** `FtpWebRequest` logins to the attacker IP as `leaver_x`, `anonymous`, `leaver_x_bak` | New FTP Server `ce208ea2` + rare FTP user `df8fa99b` | 🟡 **REAL·baseline** (these two are enabled) | FW (EAL) |
-| 3 | Massive upload | **Real** 45 MB random blob HTTP-POSTed to `personal-cloud-drop.net/upload` + the attacker IP **+** `test-dns-infiltration` / `test-proxy`.testpanw.com | Massive upload to rare storage/mail (T1567.002) (+ ✅ DNS-Sec) | 🟡 **REAL·baseline** (*enable if off*) · exact detector may miss (see below) · **+ ✅ anchor** | FW (EAL / DNS-Sec) |
+| 3 | Massive upload | **Real** 45 MB random blob HTTP-POSTed to the bulk target + a real DNS/HEAD **categorisation touch** to a real online-storage domain (`mega.nz`, categorises as online-storage) **+** `test-dns-infiltration` / `test-proxy`.testpanw.com | Massive upload to rare storage/mail (T1567.002) (+ ✅ DNS-Sec) | 🟡 **REAL·baseline** (*enable if off*) · **+ ✅ anchor** | FW (EAL / DNS-Sec) |
 
 **Bottom line:** the reliable signals are stage 2's FTP rules (enabled, near
 real-time) and stage 3's `test-*.testpanw.com` DNS-Security hits (instant). The 45
-MB upload is **genuinely transmitted**, but `personal-cloud-drop.net` is a
-fabricated domain that won't resolve and is **not categorised as online-storage /
-webmail**, so the exact "Massive upload to a rare storage or mail domain" detector
-may not match — point the destination at a real categorised storage host if you
-need that specific rule. Stage 1's sites are real and correctly categorised, but
-the named insider-browsing analytics are baseline detectors that **may be off** —
-enable T1593 / T1567.002 in the tenant. If an XDR agent is on the host, the staging
-zip raises a data-staging BIOC.
+MB upload is **genuinely transmitted**, and the destination now **really categorises
+as online-storage** — the fabricated domain was replaced with a real one (`mega.nz`).
+By default the bulk volume goes to your lab drop and the real storage domain only
+gets a small categorisation touch, so we don't dump tens of MB on a public third
+party. To fire the **exact volume-based** "Massive upload to a rare storage or mail
+domain" detector, point `StorageDomain` at a real online-storage host **you control**
+and set `UploadVolumeToStorage=$true` — the bulk flow then lands on a genuinely
+categorised rare-storage domain. Stage 1's sites are real and correctly categorised,
+but the named insider-browsing analytics are baseline detectors that **may be off**
+— enable T1593 / T1567.002 in the tenant. If an XDR agent is on the host, the
+staging zip raises a data-staging BIOC.
 
 ---
 

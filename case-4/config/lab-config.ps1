@@ -1,12 +1,13 @@
 <#
     Case 4 - Identity Compromise & AD Domination : configuration
     ------------------------------------------------------------
-    Full attack flow: the attacker brute-forces an exposed service (INITIAL
-    ACCESS), enumerates AD, poisons WPAD to capture creds, coerces the DC
+    Full attack flow: the victim is phished / drive-by compromised (INITIAL
+    ACCESS - victim lured out to the attacker), then the compromised host
+    enumerates AD, poisons WPAD to capture creds, coerces the DC
     (PetitPotam/EFSRPC), replicates secrets (DCSync), and abuses Kerberos
-    delegation (Bronze Bit). Every stage maps to an ENABLED EAL rule:
+    delegation (Bronze Bit).
 
-      1 Initial Access ..... Multiple Suspicious FTP Login Attempts   (91db0f65)
+      1 Initial Access ..... Phishing site access + malware URL (URL Filtering)
       2 Discovery .......... Rare LDAP enumeration                    (fcb12ef3)
       3 Credential Access .. Uncommon WPAD queries                    (f1546fee)
       4 Credential Access .. Suspicious EFSRPC to domain controller   (82a37634)
@@ -16,6 +17,10 @@
     Needs ITDR / Identity Analytics enabled in Cortex. Some stages (EFSRPC,
     DCSync, Bronze Bit) are best-effort natively and note the tool for the exact
     exploit - the network traffic is still generated + logged.
+
+    Stages 4/5/6 are traffic-only by default. They fire the exact detector only
+    when the operator runs with -EnableRealExploits AND the matching offensive
+    tool (PetitPotam/mimikatz/Rubeus/Impacket) is present in scripts\tools\.
 #>
 
 $Global:EalDemo = @{
@@ -28,6 +33,7 @@ $Global:EalDemo = @{
 
     DelayBetweenReqMs= 400
     DryRun           = $false
+    EnableRealExploits = $false   # OFF = traffic-only; ON (+ tool in scripts\tools\) runs the real exploit for stages 4/5/6
 
     _Title = "PANW EAL Demo - Case 4 : Identity Compromise & AD Domination"
     _ConfigFields = @(

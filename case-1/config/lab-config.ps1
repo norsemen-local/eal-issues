@@ -1,12 +1,14 @@
 <#
     Case 1 - Drive-by to Data Theft (Malware C2 & Exfil) : configuration
     --------------------------------------------------------------------
-    Full attack flow: the attacker breaches a public-facing web app (INITIAL
-    ACCESS), then the implant beacons over DGA domains + DNS tunneling, makes
-    suspicious/failed DNS lookups, and exfiltrates to a rarely-seen domain.
+    Full attack flow: the victim is phished / drive-by compromised (INITIAL
+    ACCESS - victim lured out to the attacker), then the implant beacons over DGA
+    domains + DNS tunneling, makes suspicious/failed DNS lookups, and exfiltrates
+    to a rarely-seen domain.
 
-    Every stage maps to an ENABLED EAL analytics rule:
-      1 Initial Access ..... Suspicious failed HTTP request - Spring4Shell (1028c23d)
+    Stage 1 fires from URL Filtering (see 01-initial-access.ps1); stages 2-5 map
+    to ENABLED EAL analytics rules:
+      1 Initial Access ..... Phishing site access + malware URL (URL Filtering)
       2 C2 (DGA) ........... Random-Looking Domain Names                    (ce6ae037)
       3 C2 (tunnel) ........ DNS Tunneling                                  (61a5263c)
       4 C2 (odd DNS) ....... Suspicious DNS traffic (2a77fad6) + Failed DNS (74c65024)
@@ -62,4 +64,4 @@ function Write-Stage {
 $__local = Join-Path $PSScriptRoot 'lab-config.local.ps1'
 if (Test-Path $__local) { . $__local }
 
-Write-Stage "Loaded Case-1 config (web IA=$($Global:EalDemo.TargetWebServer))" "OK"
+Write-Stage "Loaded Case-1 config (phishing IA -> attacker/C2=$($Global:EalDemo.AttackerC2))" "OK"

@@ -16,6 +16,12 @@
       Weakly-Encrypted Kerberos TGT Response                   (CredAccess T1556.001)
       Unusual ADFS Remote Synchronization ... from non-ADFS    (CredAccess T1606.002)
     NOTE: several of these may need enabling (+ ITDR) in your tenant.
+
+    Stages 4 (RC4 Kerberos TGT) and 5 (ADFS sync / Golden SAML) are TRAFFIC-ONLY
+    by default. They fire their exact detector ONLY when the operator runs with
+    -EnableRealExploits AND supplies the matching offensive tool/module (Rubeus,
+    AADInternals, or ADFSDump) -- see scripts\_exploit.ps1. Default OFF preserves
+    the traffic-only behaviour and performs no real identity operations.
 #>
 
 $Global:EalDemo = @{
@@ -30,6 +36,9 @@ $Global:EalDemo = @{
     DelayBetweenReqMs= 400
     HttpTimeoutSec   = 8
     DryRun           = $false
+    # OFF = traffic-only (default). ON (+ Rubeus/AADInternals/ADFSDump present)
+    # runs the real exploit for stages 4/5 via scripts\_exploit.ps1.
+    EnableRealExploits = $false
 
     _Title = "PANW EAL Demo - Case 9 : Pass-the-Hash Playbook (NTLM/Kerberos)"
     _ConfigFields = @(

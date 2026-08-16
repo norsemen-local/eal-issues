@@ -8,10 +8,11 @@
       .\scripts\Run-All.ps1 -PauseBetween   # pause per stage
 #>
 [CmdletBinding()]
-param([int[]]$Stages = @(1,2,3,4,5), [switch]$DryRun, [switch]$PauseBetween)
+param([int[]]$Stages = @(1,2,3,4,5), [switch]$DryRun, [switch]$PauseBetween, [switch]$EnableRealExploits)
 
 . "$PSScriptRoot\..\config\lab-config.ps1"
 $cfg = $Global:EalDemo
+if ($EnableRealExploits) { $cfg.EnableRealExploits = $true }
 $map = $cfg._StageMap        # plain hashtable keyed by int stage number
 # Default to every stage in the map (handles 5- and 6-stage cases alike).
 if (-not $PSBoundParameters.ContainsKey('Stages')) { $Stages = @($map.Keys | Sort-Object) }
@@ -28,7 +29,10 @@ foreach ($s in $Stages) {
     Write-Host "`n----- STAGE $s : $($stage.Title) -----" -ForegroundColor White
     try {
         $path = Join-Path $PSScriptRoot $stage.File
-        if ($DryRun) { & $path -DryRun } else { & $path }
+        $stageArgs = @{}
+        if ($DryRun) { $stageArgs['DryRun'] = $true }
+        if ($EnableRealExploits) { $stageArgs['EnableRealExploits'] = $true }
+        & $path @stageArgs
     } catch { Write-Stage "Stage $s error: $($_.Exception.Message)" "ERR" }
     if ($PauseBetween -and $s -ne $Stages[-1]) { Read-Host "`nPress Enter for the next stage" | Out-Null }
 }

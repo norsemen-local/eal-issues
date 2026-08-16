@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Case 1 of a 5-case Palo Alto **EAL-log detection demo** (see `../README-cases.md`).
 Theme: **Drive-by to Data Theft** — a full malware intrusion. Stage→enabled-rule
 chain (source of truth = `README.md` §1):
-1. **Initial Access** — Spring4Shell web exploit (`1028c23d`)
+1. **Initial Access** — phishing / drive-by, victim lured out to the attacker
+   (URL Filtering: *Phishing site access* + malware URL). Runs via the shared
+   `scripts/_ia-phishing.ps1` (`Invoke-PhishingIA`), **not** `_ia.ps1`.
 2. C2 — Random-Looking Domain Names / DGA flood (`ce6ae037`)
 3. C2 — DNS Tunneling >10 KB (`61a5263c`)
 4. C2 — Suspicious DNS traffic (`2a77fad6`) + Failed DNS (`74c65024`)
@@ -18,7 +20,9 @@ pattern-based Initial Access (don't replace it with a behavioural detector).
 Stages 2/3/5 also query PANW DNS-Security test domains (`*.testpanw.com`) so the
 firewall additionally **sinkholes/blocks** — the detect-AND-block bonus layer.
 Generators live in `scripts/_traffic.ps1` (DGA, tunnel, suspicious/rare DNS,
-test-domain blocks); the web IA uses the shared `scripts/_ia.ps1`.
+test-domain blocks); the phishing IA uses the shared `scripts/_ia-phishing.ps1`
+(`Invoke-PhishingIA`). `_ia.ps1` (web-exploit/FTP generators) is present but
+**unused** by this case.
 
 The older AD behavioural stages live under `scripts/optional-ad-eal/` (optional;
 agent-shadowed — not part of the main chain).

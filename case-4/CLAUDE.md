@@ -9,7 +9,9 @@ Theme: **Identity Compromise & AD Domination**. Stage→enabled-rule chain (sour
 of truth = `README.md` §1) — all rebuilt to map ONLY to enabled rules (the old
 long-username / NTLM-machine-account / ADFS-sync stages were NOT enabled and were
 removed):
-1. **Initial Access** — FTP brute (`91db0f65`, shared `_ia.ps1`)
+1. **Initial Access** — phishing / drive-by, victim lured out to the attacker
+   (URL Filtering: *Phishing site access* + malware URL). Runs via the shared
+   `scripts/_ia-phishing.ps1` (`Invoke-PhishingIA`); `_ia.ps1` is present but unused.
 2. Discovery — Rare LDAP enumeration (`fcb12ef3`)
 3. Cred Access — Uncommon WPAD queries (`f1546fee`)
 4. Cred Access — Suspicious EFSRPC to DC / PetitPotam (`82a37634`)
