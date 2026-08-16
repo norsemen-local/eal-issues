@@ -16,7 +16,7 @@ Alert reference:
 ```
    ┌─────────────────────┐         PAN NGFW (EAL + log forwarding)      ┌───────────────────┐
    │  KALI = ATTACKER/C2  │◀───────────────┬────────────────────────────▶│  WINDOWS = VICTIM  │
-   │  170.187.158.212     │  victim⇄attacker traffic (all cases)         │  (runs the scripts) │
+   │                       │  victim⇄attacker traffic (all cases)         │  (runs the scripts) │
    │  phishing/C2/exfil    │                                              └─────────┬─────────┘
    └─────────────────────┘                                                         │ internal
                                                                           ┌────────▼────────┐
@@ -142,7 +142,7 @@ So you never retype the Kali password: install an SSH key on the attacker (enter
 the password **one** time; nothing is stored in plaintext). Every `ssh`/`scp` and
 the orchestrator are passwordless afterwards.
 ```powershell
-.\Setup-AttackerAuth.ps1                 # root@170.187.158.212 by default
+.\Setup-AttackerAuth.ps1                 # root@ by default
 ```
 
 ### 1) Provision the attacker (Kali) — once
@@ -200,7 +200,7 @@ eal-demo/
 
 | Component | Requirement |
 |-----------|-------------|
-| **Attacker** | The Kali box (`170.187.158.212`), provisioned with `attacker/attacker-setup.sh`. Cloud security group must allow inbound 21, 80, 445, 2201–2203. |
+| **Attacker** | The Kali box (``), provisioned with `attacker/attacker-setup.sh`. Cloud security group must allow inbound 21, 80, 445, 2201–2203. |
 | **Victim** | A Windows host, PowerShell 5.1+, **elevated** (case 2 listener + cases 3/4 RPC). This is where the scripts run. |
 | **Internal** | For cases 3–4, a real **DC / member servers** the victim can reach. |
 | **NGFW** | The victim's egress to the attacker (and the DC) **must traverse a Palo Alto NGFW** with **Enhanced Application Logging (EAL) enabled** and **log forwarding to Cortex XSIAM/XDR**. |
