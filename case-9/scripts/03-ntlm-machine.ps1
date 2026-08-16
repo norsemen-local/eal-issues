@@ -10,6 +10,7 @@
 #>
 param([switch]$DryRun)
 . "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\_net.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
 
@@ -20,4 +21,6 @@ if ($who -notlike "*$") { Write-Stage "  (not a machine account - use PsExec -s 
 $unc = "\\$target\IPC$"
 if ($cfg.DryRun) { Write-Host "  DRY: net use $unc  (machine-account NTLM by IP)" }
 else { try { & net use $unc 2>$null | Out-Null; & net use $unc /delete /y 2>$null | Out-Null; Write-Stage "  NTLM auth attempted to $unc" "OK" } catch { Write-Stage "  attempt generated: $($_.Exception.Message)" "WARN" } }
-Write-Stage "STAGE 3 done. Expect EAL: 'Suspicious NTLM authentication with machine account'." "OK"
+# Firewall anchor: the coercion/relay tool phones home.
+Invoke-TestDns -Category "malware"
+Write-Stage "STAGE 3 done. Expect FW NGFW: DNS-Security malware + (ITDR/baseline) EAL 'Suspicious NTLM authentication with machine account'." "OK"

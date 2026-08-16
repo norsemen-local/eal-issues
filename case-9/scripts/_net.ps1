@@ -44,6 +44,26 @@ function Invoke-Ftp {
     Start-Sleep -Milliseconds $cfg.DelayBetweenReqMs
 }
 
+function Invoke-TestDns {
+    <# Category-matched PANW DNS-Security TEST domain. Fires an INSTANT,
+       firewall-sourced (PAN NGFW) DNS threat detection - NO 30-day baseline
+       needed - so every stage produces a real firewall alert even in a fresh
+       tenant. $Category e.g. c2, dga, dnstun, ddns, fastflux, adtracking,
+       malware, fake-software, dns-infiltration, proxy, subdomain-reputation,
+       strategically-aged, nrd. #>
+    param([string]$Category)
+    $cfg = $Global:EalDemo
+    $fqdn = "test-$Category.testpanw.com"
+    if ($cfg.DryRun) { Write-Host "  DRY: resolve $fqdn  (FW DNS Security: $Category)"; return }
+    try {
+        $ans = Resolve-DnsName -Name $fqdn -Type A -QuickTimeout -ErrorAction Stop
+        $ip  = ($ans | Where-Object IPAddress | Select-Object -First 1 -Expand IPAddress)
+        if ($ip -like "72.5.65.*" -or $ip -eq "0.0.0.0") { Write-Stage "  FW DNS-Security [$Category] $fqdn -> SINKHOLED $ip" "BLOCK" }
+        else { Write-Stage "  FW DNS-Security [$Category] $fqdn -> $ip (categorised; check FW threat log)" "OK" }
+    } catch { Write-Stage "  FW DNS-Security [$Category] $fqdn -> blocked/NXDOMAIN by firewall" "BLOCK" }
+    Start-Sleep -Milliseconds 150
+}
+
 function Invoke-SshConn {
     param([string]$Server, [int]$Port=22, [string]$ClientBanner=$null, [int]$HoldSeconds=0, [int]$SendKB=0, [string]$Label)
     $cfg = $Global:EalDemo

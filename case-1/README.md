@@ -71,6 +71,32 @@ DNS Security sinkholes. See [`docs/verification-checklist.md`](docs/verification
 
 ---
 
-## 5. Safety
+## 5. Real vs simulated — will the FW / XDR agent actually recognise this?
+
+**Legend** — ✅ **REAL·instant (FW)**: signature/category, fires first-run, usually
+blocks. 🟡 **REAL·baseline (EAL)**: genuine traffic the analytic models, fires only
+after the ~30-day-train/14-day-activate baseline matures (or is seeded). 🟠
+**SIMULATED**: approximation — the exact detector won't truly fire without a real
+tool. (See the root [`../README.md`](../README.md) for the full legend.)
+
+| # | Stage | What the code ACTUALLY sends | Detection | Class | Source |
+|---|-------|------------------------------|-----------|-------|--------|
+| 1 | Phishing / drive-by IA | Real GETs to `urlfiltering.paloaltonetworks.com/test-phishing` + `/test-malware`, plus cosmetic `invoice.html`/`update.exe` from the attacker IP | Phishing/malware URL categorisation | ✅ **REAL·instant** (test pages) · 🟠 the attacker-IP GETs are cosmetic | FW (URL Filtering) |
+| 2 | DGA / random domains | 45 real `Resolve-DnsName` lookups of random labels + `test-dga.testpanw.com` | Random-Looking Domain Names `ce6ae037` (+ ✅ DGA sinkhole) | 🟡 **REAL·baseline** (+ ✅ anchor) | FW (EAL / DNS-Security) |
+| 3 | DNS tunnelling | Real TXT queries ~15 KB under `tunnel.demo-c2-lab.net` + `test-dnstun.testpanw.com` | DNS Tunneling `61a5263c` (+ ✅ tunnel sinkhole) | 🟡 **REAL·baseline** (+ ✅ anchor) | FW (EAL / DNS-Security) |
+| 4 | Suspicious / failed DNS | Real malformed TXT/NULL/ANY queries → NXDOMAIN (no test-domain anchor) | Suspicious DNS `2a77fad6` + Failed DNS `74c65024` | 🟡 **REAL·baseline** | FW (EAL) |
+| 5 | Rare-domain exfil | Real DNS + HTTP GET `rare-exfil-demo.net/beacon` ×10 + `test-dns-infiltration.testpanw.com` | Abnormal Comms to a Rare Domain `c2da63d1` (+ ✅ infiltration sinkhole) | 🟡 **REAL·baseline** (+ ✅ anchor) | FW (EAL / DNS-Security) |
+
+**Bottom line:** on a fresh tenant only the phishing/malware URL hit and the three
+`test-*.testpanw.com` sinkholes fire on the first run. Stages 2–5 send **genuine**
+DGA/tunnel/rare-domain DNS — real traffic the analytics model — but those named
+rules only fire once the baseline matures or is seeded. **Nothing here is a real
+malware infection**; the "payload" fetch is a plain HTTP GET. Note a doc/label
+drift: `CLAUDE.md`/`lab-config.ps1` call stage 1 "Spring4Shell `1028c23d`", but the
+running code does **URL-Filtering phishing**, not Spring4Shell.
+
+---
+
+## 6. Safety
 Phishing uses Palo Alto's benign URL-Filtering test pages; DNS lookups are benign;
 PANW test domains only. `DryRun` sends nothing. Authorized labs only.

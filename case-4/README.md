@@ -66,7 +66,41 @@ See [`docs/verification-checklist.md`](docs/verification-checklist.md).
 
 ---
 
-## 5. Safety
+## 5. Real vs simulated — will the FW / XDR agent actually recognise this?
+
+**Legend** — ✅ **REAL·instant (FW)**: signature/category, fires first-run. 🟡
+**REAL·baseline (EAL/ITDR)**: genuine traffic the analytic models, fires only after
+the baseline matures **and** ITDR + a real AD lab are in place. 🟠 **SIMULATED**:
+approximation only — the exact detector will **not** fire without a real offensive
+tool.
+
+**This case has the most simulated content in the repo.** The first three stages
+are real; the three "exact exploit" stages only open the SMB/RPC/Kerberos *surface*
+those attacks ride on — they never make the defining protocol call, and the scripts
+say so and point to the helper tool.
+
+| # | Stage | What the code ACTUALLY sends | Detection | Class | Source |
+|---|-------|------------------------------|-----------|-------|--------|
+| 1 | Phishing / drive-by IA | Real GETs to PANW URL-Filtering test pages + attacker-IP fetch | Phishing/malware URL categorisation | ✅ **REAL·instant** | FW (URL Filtering) |
+| 2 | LDAP enumeration | Real `DirectorySearcher` queries (Domain Admins, SPN/Kerberoast, AS-REP, unconstrained deleg, trusts) to the DC | Rare LDAP enumeration `fcb12ef3` | 🟡 **REAL·baseline** (needs ITDR) | FW (EAL) |
+| 3 | WPAD (AITM) | Real `Resolve-DnsName` + `GET http://wpad/wpad.dat` ×3 names ×4 | Uncommon WPAD queries `f1546fee` | 🟡 **REAL·baseline** | FW (EAL) |
+| 4 | EFSRPC / PetitPotam | `net use \\DC\IPC$`, opens `\pipe\efsrpc` / `\pipe\lsarpc` — **SMB pipe connect only, no `EfsRpcOpenFileRaw` coercion** | Suspicious EFSRPC to DC `82a37634` | 🟠 **SIMULATED** — needs PetitPotam.exe / Impacket | FW (EAL) |
+| 5 | DCSync from non-DC | Port-135 probe + touches `\pipe\lsarpc`/`samr`/`netlogon` — **no DRSUAPI `GetNCChanges`, never even binds the drsuapi pipe** | Possible DCSync from non-DC `b00baad9` | 🟠 **SIMULATED** — needs mimikatz / Impacket secretsdump | FW (EAL) |
+| 6 | Bronze Bit | Requests ordinary Kerberos service tickets for HOST/CIFS/LDAP SPNs — **no S4U2self/S4U2proxy, no forged forwardable flag (CVE-2020-17049)** | Bronze-Bit exploit `115c6f43` | 🟠 **SIMULATED** — needs Rubeus / Impacket getST | FW (EAL) |
+
+**Bottom line:** on a fresh tenant only stage 1 fires first-run. Stages 2–3 are
+**real** LDAP/WPAD traffic that alerts once the baseline matures with ITDR enabled
+against a real AD lab. **Stages 4, 5 and 6 will not trigger their named detectors
+as shipped** — they generate look-alike SMB/RPC/Kerberos traffic but not the actual
+coercion/replication/ticket-forgery. Drop `PetitPotam.exe` / `mimikatz.exe` /
+`Rubeus.exe` in `scripts\tools\` for the genuine article (the scripts detect their
+presence but never auto-run them). Doc drift: README §1/`CLAUDE.md` label stage 1
+"FTP brute `91db0f65`", but the running code does **phishing URL-Filtering** —
+treat stage 1 as phishing.
+
+---
+
+## 6. Safety
 Phishing uses benign test pages; failed logins, WPAD lookups, named-pipe /
 replication RPC, and normal ticket requests only. EFSRPC/DCSync/Bronze-Bit are
 best-effort natively and flag the tool required for the exact exploit. Authorized

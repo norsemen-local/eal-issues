@@ -80,6 +80,39 @@ traversal / Spring4Shell / code-injection. See
 
 ---
 
-## 5. Safety
+## 5. Real vs simulated — will the FW / XDR agent actually recognise this?
+
+**Legend** — ✅ **REAL·instant (FW)**: signature/category, fires first-run, usually
+blocks. 🟡 **REAL·baseline (EAL)**: genuine traffic the analytic models, fires only
+after the baseline matures. 🟠 **SIMULATED**: approximation only.
+
+This is the **strongest "real" case in the repo.** Every stage transmits authentic
+malicious HTTP over the wire — the exploit *strings* are the real ones, so PAN
+Vulnerability Protection and the web-attack analytics genuinely match them. The
+only thing "benign" is the *effect*: the payloads don't achieve RCE and the target
+may be an unrelated host. A block/reset/4xx is treated as success — the rejected
+request is the signal.
+
+| # | Stage | What the code ACTUALLY sends | Detection | Class | Source |
+|---|-------|------------------------------|-----------|-------|--------|
+| 1 | Path traversal | Real GETs with `../../../../etc/passwd`, `..%2f`, `....//` | Possible path traversal `60da6e16` | ✅ **REAL·instant** (+ Vuln-Protection block) | FW |
+| 2 | Spring4Shell | GET + POST carrying the genuine `class.module.classLoader.resources.context.parent.pipeline.first.pattern` CVE-2022-22965 payload | Spring4Shell `1028c23d` | ✅ **REAL·instant** (+ Vuln-Protection block) | FW |
+| 3 | Web-shell / suspicious params | `cmd=whoami`, `<?php system()?>`, `{{7*7}}` SSTI, `php://filter` | Suspicious HTTP parameters `3508f6b4` | ✅ **REAL·instant** (content/pattern) | FW |
+| 4 | Rare UA + Server | 6 GETs to `/beacon` with odd User-Agents (MSIE5/Win98, python-requests-c2, Nim/Go stagers) | Rare HTTP UA+Server combo `c13fd72e` | 🟡 **REAL·baseline** | FW |
+| 5 | Covert HTTP channel | Real `PUT /upload`, `PATCH /api`, `GET /pixel.gif?d=<b64>` with base64 in `X-Session-Data` + gif content-type mismatch | HTTP with suspicious characteristics `7fbfd969` | 🟡 **REAL·baseline** | FW |
+
+**Bottom line:** stages 1–3 fire on the **first request** and produce
+Vuln-Protection **block/reset** entries in Monitor ▸ Threat — the best live proof
+in the whole repo. Stages 4–5 are real C2/exfil-shaped HTTP that the rare-UA and
+HTTP-anomaly analytics only surface once their baseline matures. **No stage is
+simulated-only.** These are all firewall-sourced network detections — an XDR
+endpoint agent adds nothing here (no web shell is actually written), so ignore the
+aspirational "(or XDR agent)" comments in the code. As shipped, the PowerShell
+stages run **victim → target** (the inbound Kali `attack-web.sh` is the alternate
+driver); detection only needs the request to *traverse* the firewall.
+
+---
+
+## 6. Safety
 Dummy payloads only — no real exploitation. Attack a lab web server you own /
 are authorized to test. `DryRun` sends nothing.

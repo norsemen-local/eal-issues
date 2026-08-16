@@ -25,4 +25,7 @@ foreach ($p in @(808, 445)) {
     $ok = Test-NetConnection -ComputerName $adfs -Port $p -InformationLevel Quiet -WarningAction SilentlyContinue
     Write-Stage "  ADFS sync port ${p} -> $([string]$ok)" "OK"
 }
-Write-Stage "STAGE 5 done. Expect EAL: 'Unusual ADFS Remote Synchronization ... from non-ADFS server'." "OK"
+# Firewall anchor: the stolen token-signing certificate is exfiltrated.
+Invoke-TestDns -Category "dns-infiltration"
+Invoke-TestDns -Category "c2"
+Write-Stage "STAGE 5 done. Expect FW NGFW: DNS-Security dns-infiltration/C2 + (ITDR/baseline) EAL 'Unusual ADFS Remote Synchronization'." "OK"

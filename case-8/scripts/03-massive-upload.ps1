@@ -33,4 +33,6 @@ if ($cfg.DryRun) {
     } catch { Write-Stage "  payload error: $($_.Exception.Message)" "WARN" }
     finally { if (Test-Path $tmp) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue } }
 }
-Write-Stage "STAGE 3 done. Expect EAL: 'Massive upload to a rare storage or mail domain' (T1567.002)." "OK"
+Invoke-TestDns -Category "dns-infiltration"
+Invoke-TestDns -Category "proxy"
+Write-Stage "STAGE 3 done. Expect FW NGFW: DNS-Security dns-infiltration/proxy + (once enabled) EAL 'Massive upload to rare storage/mail' T1567.002." "OK"

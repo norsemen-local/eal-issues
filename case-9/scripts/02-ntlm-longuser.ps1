@@ -9,8 +9,14 @@
 #>
 param([switch]$DryRun)
 . "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\_net.ps1"
+. "$PSScriptRoot\_endpoint.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
+
+# --- XDR endpoint layer: credential tooling reads certificate stores -------
+Write-Stage "STAGE 2a (XDR/endpoint): credential tool accesses certificate files" "INFO"
+Invoke-CertFileAccess
 
 $target = $cfg.AuthTarget
 Write-Stage "STAGE 2 (Cred Access): long-username + NTLM-by-IP to $target" "INFO"
@@ -27,4 +33,6 @@ foreach ($u in $weird) {
 $unc = "\\$target\IPC$"
 if ($cfg.DryRun) { Write-Host "  DRY: net use $unc  (NTLM forced by IP)" }
 else { try { & net use $unc 2>$null | Out-Null; & net use $unc /delete /y 2>$null | Out-Null; Write-Stage "  NTLM auth to $unc" "OK" } catch {} }
-Write-Stage "STAGE 2 done. Expect EAL: 'Failed Login For a Long Username...' + 'Rare NTLM Usage by User'." "OK"
+# Firewall anchor: the attacker's credential-relay tooling beacons to C2.
+Invoke-TestDns -Category "c2"
+Write-Stage "STAGE 2 done. Expect FW NGFW: DNS-Security C2 + (ITDR/baseline) EAL 'Failed Login For a Long Username' + 'Rare NTLM Usage by User'." "OK"

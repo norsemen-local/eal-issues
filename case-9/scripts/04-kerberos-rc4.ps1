@@ -11,6 +11,7 @@
 #>
 param([switch]$DryRun)
 . "$PSScriptRoot\..\config\lab-config.ps1"
+. "$PSScriptRoot\_net.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
 
@@ -26,4 +27,6 @@ foreach ($spn in $spns) {
     Start-Sleep -Milliseconds $cfg.DelayBetweenReqMs
 }
 Write-Stage "  Tip: 'klist' shows cached tickets; etype 23 (RC4) is the weak one." "INFO"
-Write-Stage "STAGE 4 done. Expect EAL: 'Weakly-Encrypted Kerberos TGT Response'." "OK"
+# Firewall anchor: the kerberoast tool exfils tickets to C2.
+Invoke-TestDns -Category "c2"
+Write-Stage "STAGE 4 done. Expect FW NGFW: DNS-Security C2 + (ITDR/baseline) EAL 'Weakly-Encrypted Kerberos TGT Response'." "OK"

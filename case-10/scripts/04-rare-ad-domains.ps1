@@ -10,8 +10,13 @@
 param([switch]$DryRun)
 . "$PSScriptRoot\..\config\lab-config.ps1"
 . "$PSScriptRoot\_net.ps1"
+. "$PSScriptRoot\_endpoint.ps1"
 $cfg = $Global:EalDemo
 if ($DryRun) { $cfg.DryRun = $true }
+
+# --- XDR endpoint layer: stealth persistence via file-association hijack ----
+Write-Stage "STAGE 4a (XDR/endpoint): default file-association manipulation" "INFO"
+Set-FileAssocTamper -Ext ".eal"
 
 $doms = $cfg.AdDomains -split '\s*,\s*' | Where-Object { $_ }
 Write-Stage "STAGE 4 (Adware beaconing): $($doms.Count) rare advertising domains" "INFO"
@@ -21,4 +26,5 @@ foreach ($round in 1..3) {
         Invoke-Http -Url "http://$d/px?cid=$([guid]::NewGuid())" -UserAgent "Mozilla/5.0 (Windows NT 10.0) AdClient" -Label "ad beacon $d"
     }
 }
-Write-Stage "STAGE 4 done. Expect EAL: 'Rare access to known advertising domains'." "OK"
+Invoke-TestDns -Category "adtracking"
+Write-Stage "STAGE 4 done. Expect FW NGFW: DNS-Security ad-tracking + (once enabled) EAL 'Rare access to known advertising domains'." "OK"

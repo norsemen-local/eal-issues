@@ -21,4 +21,6 @@ foreach ($round in 1..3) {
         Invoke-Http -Url "http://$d/gate.php" -UserAgent "Mozilla/5.0 (Windows NT 10.0)" -Label "dyndns beacon $d"
     }
 }
-Write-Stage "STAGE 3 done. Expect EAL: 'Recurring rare domain access to dynamic DNS domain' (rule 00977673)." "OK"
+Invoke-TestDns -Category "ddns"
+Invoke-TestDns -Category "fastflux"
+Write-Stage "STAGE 3 done. Expect FW NGFW: DNS-Security dynamic-DNS/fast-flux + (once baselined) EAL 'Recurring rare dyn-DNS' 00977673." "OK"

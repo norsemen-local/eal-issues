@@ -19,4 +19,5 @@ Write-Stage "STAGE 2 (Update hijack): update requests to rogue server $srv" "INF
 $paths = @("/ClientWebService/client.asmx", "/selfupdate/wuident.cab",
            "/ClientWebService/client.asmx/GetConfig", "/selfupdate/wuredir.cab")
 foreach ($p in $paths) { Invoke-Http -Url "http://$srv$p" -UserAgent $ua -Label "WSUS $p" }
-Write-Stage "STAGE 2 done. Expect EAL: 'Rare MS-Update Server was detected' (rule 3d068240)." "OK"
+Invoke-TestDns -Category "fake-software"
+Write-Stage "STAGE 2 done. Expect FW NGFW: DNS-Security fake/malicious-software + (once baselined) EAL 'Rare MS-Update Server' 3d068240." "OK"
